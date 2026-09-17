@@ -40,7 +40,7 @@ export class MockAIController implements PlayerController {
     const speed = obs.directive.id === "SPEEDRUNNER";
     const guardian = obs.directive.id === "GUARDIAN";
     const collector = obs.directive.id === "COLLECTOR";
-    const hunter = obs.directive.id === "SCORE_HUNTER";
+    const hunter = obs.directive.id === "SCORE_HUNTER" || obs.directive.id === "MONSTER_SLAYER";
     if (hunter) input.holdForMs = 100;
     const boss = obs.enemies.find((e) => e.type === "consensus_engine");
     const target = obs.enemies.find((e) => e.withinWeaponRange && e.lineOfFireClear);
@@ -129,7 +129,7 @@ export class MockAIController implements PlayerController {
     const wall = (dx < 0 ? terrain.leftWallDistance : terrain.rightWallDistance) ?? Infinity;
     const unsafe = dx < 0 ? !terrain.safeLandingLeft : !terrain.safeLandingRight;
     const risingGoal = dy < -24 && terrain.jumpWouldReachPlatform;
-    if (!self.grounded && self.velocity.y < 0) input.verticalAction = "jump";
+    if (self.jumpHeld && !self.grounded && self.velocity.y < 0) input.verticalAction = "jump";
     if (self.grounded && !fighting && (wall < 38 || unsafe || risingGoal)) {
       input.verticalAction = "jump";
     }

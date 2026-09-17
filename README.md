@@ -40,13 +40,16 @@ inputs never gain special movement or timing privileges.
 
 ## Directives
 
-| Directive    | Priority                                    |
-| ------------ | ------------------------------------------- |
-| SPEEDRUNNER  | Forward progress and safe dashes.           |
-| COLLECTOR    | Coins and optional ledges.                  |
-| SCORE_HUNTER | Visible enemies and opportunities to score. |
-| GUARDIAN     | Staying close and reviving the teammate.    |
+| Directive      | Priority                                          |
+| -------------- | ------------------------------------------------- |
+| SPEEDRUNNER    | Forward progress and safe dashes.                 |
+| COLLECTOR      | Coins and optional ledges.                        |
+| SCORE_HUNTER   | Visible enemies and opportunities to score.       |
+| GUARDIAN       | Staying close and reviving the teammate.          |
+| MONSTER_SLAYER | Clearing enemies and the boss before progressing. |
 
+Choose among five modes at launch or switch JEV mode during play without restarting.
+Recorded comparisons keep their chosen directive fixed until the replay ends.
 Live directives change observation text and server question instructions. Mock
 implements the same priorities using local heuristics. Neither changes physics,
 weapon numbers or hitboxes. See [GAMEPLAY.md](docs/GAMEPLAY.md) for the walkthrough,
@@ -108,7 +111,7 @@ The unit suite includes full-level scripted and dual-Mock wins through real inpu
 limits, hazards, revives, score accounting and strict 3,000-tick directive comparisons.
 The contract documentation test fails when its generated Zod reference drifts.
 
-Once the integrated client supplies `tests/e2e`, run:
+Run the browser suite for controls, pause/settings, and recorded directive comparisons:
 
 ```bash
 npx playwright install --with-deps chromium

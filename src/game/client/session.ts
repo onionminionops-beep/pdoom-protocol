@@ -79,6 +79,7 @@ export class ClientSession {
   readonly world: WorldState;
   readonly clock = new FixedClock();
   private controllers: Record<PlayerId, PlayerController>;
+  private controllerGenerations: Record<PlayerId, number> = { p1: 0, p2: 0 };
   private bridges: HumanInputBridge[] = [];
   private paused = false;
   private disposed = false;
@@ -108,26 +109,7 @@ export class ClientSession {
     this.recording =
       !this.replay && this.world.slots.p1 === "HUMAN" ? new HumanInputRecording(this.world) : null;
     this.metrics = new ComparisonMetrics(this.world);
-    const makeController = (id: PlayerId) =>
-      createController(options.slots[id], {
-        episodeId: this.world.episodeId,
-        onStatus: (status) => {
-          if (this.disposed || id !== "p2") return;
-          this.jevStatus = { ...status };
-          if (status.mode === "live" && this.controllers.p2 instanceof JevController) {
-            const decision = this.controllers.p2.getLastDecision();
-            if (decision && decision.requestId !== this.decisions.at(-1)?.requestId) {
-              this.decisions.push(decision);
-              this.metrics.decision(decision.latencyMs);
-              this.latencySum += decision.latencyMs;
-              const answers = Object.values(decision.answers);
-              this.confidenceSum +=
-                answers.reduce((sum, answer) => sum + answer.confidence, 0) / answers.length;
-            }
-          }
-        },
-      });
-    this.controllers = { p1: makeController("p1"), p2: makeController("p2") };
+    this.controllers = { p1: this.makeController("p1"), p2: this.makeController("p2") };
     for (const id of ["p1", "p2"] as const) {
       const controller = this.controllers[id];
       if (id === "p1" && this.replay) {
@@ -152,6 +134,49 @@ export class ClientSession {
         }),
       });
     }
+  }
+
+  private makeController(id: PlayerId): PlayerController {
+    const generation = ++this.controllerGenerations[id];
+    return createController(this.world.slots[id], {
+      episodeId: this.world.episodeId,
+      onStatus: (status) => {
+        if (!this.disposed && id === "p2" && generation === this.controllerGenerations[id]) {
+          this.jevStatus = { ...status };
+          if (status.mode === "live" && this.controllers.p2 instanceof JevController) {
+            const decision = this.controllers.p2.getLastDecision();
+            if (decision && decision.requestId !== this.decisions.at(-1)?.requestId) {
+              this.decisions.push(decision);
+              this.metrics.decision(decision.latencyMs);
+              this.latencySum += decision.latencyMs;
+              const answers = Object.values(decision.answers);
+              this.confidenceSum +=
+                answers.reduce((sum, answer) => sum + answer.confidence, 0) / answers.length;
+            }
+          }
+        }
+      },
+    });
+  }
+
+  setDirective(directive: DirectiveId): void {
+    if (
+      this.disposed ||
+      this.replay ||
+      this.world.status !== "playing" ||
+      this.world.directive === directive
+    )
+      return;
+    this.world.directive = directive;
+    for (const id of ["p1", "p2"] as const) {
+      const controller = this.controllers[id];
+      if (controller.kind !== "JEV" && controller.kind !== "MOCK_AI") continue;
+      this.controllerGenerations[id]++;
+      controller.dispose();
+      if (id === "p2") this.jevStatus = null;
+      this.controllers[id] = this.makeController(id);
+    }
+    this.publish();
   }
 
   setPaused(paused: boolean): void {

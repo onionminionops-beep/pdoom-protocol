@@ -100,6 +100,7 @@ export const GameObservationV1Schema = z.object({
     ammunition: z.number().nullable(),
     canShoot: z.boolean(),
     canJump: z.boolean(),
+    jumpHeld: z.boolean().default(false),
     canDash: z.boolean(),
     dashCooldownMs: z.number(),
     canInteract: z.boolean(),

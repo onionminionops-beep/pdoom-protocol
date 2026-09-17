@@ -1,9 +1,11 @@
 import { MOVEMENT } from "@/game/config/movement";
 import { WEAPONS } from "@/game/config/weapons";
-import { DIRECTIVES } from "@/game/contracts/directives";
+import type { DirectiveId } from "@/game/contracts/directives";
 import { keyLabel, type ClientSettings } from "@/game/client/settings";
 import type { ClientSnapshot } from "@/game/client/session";
 import { CharacterMark } from "./CharacterMark";
+import { JevActions } from "./JevActions";
+import { DirectiveSelect } from "./DirectiveSelect";
 
 export function elapsedLabel(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -15,11 +17,13 @@ export function Hud({
   settings,
   onPause,
   onQuit,
+  onDirectiveChange,
 }: {
   snapshot: ClientSnapshot;
   settings: ClientSettings;
   onPause: () => void;
   onQuit: () => void;
+  onDirectiveChange: (directive: DirectiveId) => void;
 }) {
   const { world, jevStatus } = snapshot;
   const room = world.level.rooms.find((room) => room.id === world.currentRoomId);
@@ -77,6 +81,7 @@ export function Hud({
                   value={disabled ? 0 : player.health}
                   max={MOVEMENT.maxHealth}
                 />
+                {id === "p2" && <JevActions player={player} slot={world.slots.p2} />}
                 <div className="weapon-line">
                   <span>{WEAPONS[player.weapon].label}</span>
                   <span>
@@ -126,7 +131,16 @@ export function Hud({
           {mode}
           {jevStatus?.lastLatencyMs != null ? ` / ${Math.round(jevStatus.lastLatencyMs)} MS` : ""}
         </span>
-        <span className="directive-pill">{DIRECTIVES[world.directive].hudLabel}</span>
+        <DirectiveSelect
+          directive={world.directive}
+          disabled={
+            world.slots.p2 === "DISABLED" ||
+            world.slots.p2 === "HUMAN" ||
+            world.status !== "playing" ||
+            snapshot.replayTicks !== null
+          }
+          onChange={onDirectiveChange}
+        />
       </div>
       {downed && (
         <p className="revive-prompt" role="status">

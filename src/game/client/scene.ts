@@ -29,6 +29,7 @@ interface Effect {
 export class ProtocolScene extends Phaser.Scene {
   private backdrop!: Phaser.GameObjects.Graphics;
   private backdropLayers: Phaser.GameObjects.Graphics[] = [];
+  private backdropShade!: Phaser.GameObjects.Graphics;
   private drawing!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Graphics;
   private texts: Phaser.GameObjects.Text[] = [];
@@ -60,6 +61,7 @@ export class ProtocolScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(-8 + layer),
     );
+    this.backdropShade = this.add.graphics().setScrollFactor(0).setDepth(-5);
     this.drawing = this.add.graphics().setDepth(0);
     this.overlay = this.add.graphics().setDepth(4);
     this.manifest = parseRenderManifest(this.cache.json.get("art-manifest"));
@@ -597,6 +599,7 @@ export class ProtocolScene extends Phaser.Scene {
   }
 
   private drawBackdrop(scrollX: number, width: number, height: number): void {
+    this.backdropShade.clear().fillStyle(0x000000, 0.35).fillRect(0, 0, width, height);
     const g = this.backdrop.clear();
     g.fillStyle(0x090b18).fillRect(0, 0, width, height);
     g.fillStyle(0x191e39).fillCircle(width * 0.73, height * 0.24, 48);

@@ -111,7 +111,7 @@ when regeneration is explicitly requested with `UPDATE_CONTRACTS=1`.
 | `tick`                                                  | yes      | `integer; min=0; max=9007199254740991`                                                                                                |
 | `timestampMs`                                           | yes      | `number; min=0`                                                                                                                       |
 | `directive`                                             | yes      | `object`                                                                                                                              |
-| `directive.id`                                          | yes      | `"SPEEDRUNNER", "COLLECTOR", "SCORE_HUNTER", "GUARDIAN"`                                                                              |
+| `directive.id`                                          | yes      | `"SPEEDRUNNER", "COLLECTOR", "SCORE_HUNTER", "GUARDIAN", "MONSTER_SLAYER"`                                                            |
 | `directive.description`                                 | yes      | `string; maxLength=400`                                                                                                               |
 | `objective`                                             | yes      | `object`                                                                                                                              |
 | `objective.type`                                        | yes      | `"traverse", "survive", "defeat_enemies", "revive_teammate", "interact", "reach_exit"`                                                |
@@ -138,6 +138,7 @@ when regeneration is explicitly requested with `UPDATE_CONTRACTS=1`.
 | `self.ammunition`                                       | yes      | `number,null`                                                                                                                         |
 | `self.canShoot`                                         | yes      | `boolean`                                                                                                                             |
 | `self.canJump`                                          | yes      | `boolean`                                                                                                                             |
+| `self.jumpHeld`                                         | yes      | `boolean`                                                                                                                             |
 | `self.canDash`                                          | yes      | `boolean`                                                                                                                             |
 | `self.dashCooldownMs`                                   | yes      | `number`                                                                                                                              |
 | `self.canInteract`                                      | yes      | `boolean`                                                                                                                             |
@@ -245,7 +246,7 @@ when regeneration is explicitly requested with `UPDATE_CONTRACTS=1`.
 | `observation.tick`                                                  | yes      | `integer; min=0; max=9007199254740991`                                                                                                |
 | `observation.timestampMs`                                           | yes      | `number; min=0`                                                                                                                       |
 | `observation.directive`                                             | yes      | `object`                                                                                                                              |
-| `observation.directive.id`                                          | yes      | `"SPEEDRUNNER", "COLLECTOR", "SCORE_HUNTER", "GUARDIAN"`                                                                              |
+| `observation.directive.id`                                          | yes      | `"SPEEDRUNNER", "COLLECTOR", "SCORE_HUNTER", "GUARDIAN", "MONSTER_SLAYER"`                                                            |
 | `observation.directive.description`                                 | yes      | `string; maxLength=400`                                                                                                               |
 | `observation.objective`                                             | yes      | `object`                                                                                                                              |
 | `observation.objective.type`                                        | yes      | `"traverse", "survive", "defeat_enemies", "revive_teammate", "interact", "reach_exit"`                                                |
@@ -272,6 +273,7 @@ when regeneration is explicitly requested with `UPDATE_CONTRACTS=1`.
 | `observation.self.ammunition`                                       | yes      | `number,null`                                                                                                                         |
 | `observation.self.canShoot`                                         | yes      | `boolean`                                                                                                                             |
 | `observation.self.canJump`                                          | yes      | `boolean`                                                                                                                             |
+| `observation.self.jumpHeld`                                         | yes      | `boolean`                                                                                                                             |
 | `observation.self.canDash`                                          | yes      | `boolean`                                                                                                                             |
 | `observation.self.dashCooldownMs`                                   | yes      | `number`                                                                                                                              |
 | `observation.self.canInteract`                                      | yes      | `boolean`                                                                                                                             |

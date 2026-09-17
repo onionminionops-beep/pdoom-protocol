@@ -205,6 +205,12 @@ h1 > span:not(.title-period) {
 .title-backdrop.bg_near {
   background-position-x: 70%;
 }
+.title-backdrop-shade {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
 .title-crest {
   position: absolute;
   width: 192px;

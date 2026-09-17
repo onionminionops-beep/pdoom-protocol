@@ -207,6 +207,7 @@ export function buildObservation(
         self.dashTimeMs <= 0 &&
         (self.ammo[self.weapon] ?? 1) > 0,
       canJump: self.alive && !self.downed && (self.grounded || self.coyoteMs > 0),
+      jumpHeld: self.jumpHeld,
       canDash: self.alive && !self.downed && self.dashCooldownMs <= 0 && self.dashTimeMs <= 0,
       dashCooldownMs: self.dashCooldownMs,
       canInteract: anyInteractInRange,

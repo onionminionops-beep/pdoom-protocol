@@ -137,6 +137,11 @@ export default function GameShell() {
     launch({ slots: { p1: "HUMAN", p2: companion }, directive, replay });
   }
 
+  function updateDirective(directive: DirectiveId) {
+    sessionRef.current?.setDirective(directive);
+    setOptions((current) => ({ ...current, directive }));
+  }
+
   function downloadDecisions() {
     const url = URL.createObjectURL(
       new Blob([sessionRef.current?.decisionLog() ?? ""], { type: "application/x-ndjson" }),
@@ -176,7 +181,13 @@ export default function GameShell() {
         />
       ) : (
         <main className="game-shell">
-          <Hud snapshot={snapshot} settings={settings} onPause={() => pause(true)} onQuit={quit} />
+          <Hud
+            snapshot={snapshot}
+            settings={settings}
+            onPause={() => pause(true)}
+            onQuit={quit}
+            onDirectiveChange={updateDirective}
+          />
           <section className="viewport-frame" aria-label="Game viewport">
             <PhaserCanvas session={session} />
           </section>
@@ -348,7 +359,9 @@ export default function GameShell() {
               ))}
             </select>
           </label>
-          <p>Changing priorities takes effect when you restart the episode.</p>
+          <p>
+            This selection applies after restart. Use JEV mode in the HUD to switch during play.
+          </p>
           <div className="pause-actions">
             <button className="primary-button" onClick={() => pause(false)}>
               Resume protocol

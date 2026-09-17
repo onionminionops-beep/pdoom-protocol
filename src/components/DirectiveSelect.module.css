@@ -1,0 +1,35 @@
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
+  color: #bac7d3;
+  font:
+    10px/1.4 var(--font-geist-mono),
+    monospace;
+}
+
+.control select {
+  flex: 1;
+  width: 230px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 5px;
+  border: 1px solid #49586b;
+  border-radius: 3px;
+  color: #e5efe8;
+  background: #121b29;
+  font: inherit;
+}
+
+.control select:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .control {
+    flex: 1 1 100%;
+  }
+}

@@ -76,6 +76,25 @@ describe("recorded directive comparisons", () => {
     }
   });
 
+  it("keeps the chosen directive fixed throughout a comparison replay", () => {
+    const source = session();
+    source.advance(TICK_MS, 0);
+    const replay = source.getRecording();
+    if (!replay) throw new Error("Missing recording");
+    const audio = createClientAudio();
+    const comparison = new ClientSession(
+      { slots: { p1: "HUMAN", p2: "MOCK_AI" }, directive: "SPEEDRUNNER", replay },
+      defaultSettings(),
+      audio,
+      false,
+    );
+    disposables.push(comparison, audio);
+    comparison.setDirective("MONSTER_SLAYER");
+    comparison.advance(TICK_MS, 0);
+    expect(comparison.world.directive).toBe("SPEEDRUNNER");
+    expect(comparison.comparison?.directive).toBe("SPEEDRUNNER");
+  });
+
   it("freezes a recording snapshot while the source episode continues", () => {
     const source = session();
     source.advance(TICK_MS, 0);

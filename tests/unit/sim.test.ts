@@ -134,4 +134,66 @@ describe("simulation", () => {
     }
     expect(w.players.p2.pos.x).toBeGreaterThan(x0 + MOVEMENT.runSpeed * 2);
   });
+
+  it("exposes held jump while airborne even though another jump cannot start", () => {
+    const w = mk();
+    w.players.p2.pos = { x: 350, y: 492 };
+    w.players.p2.grounded = true;
+    stepWorld(w, {
+      p1: neutralInput(w.episodeId, w.tick),
+      p2: input(w.episodeId, w.tick, { verticalAction: "jump" }),
+    });
+    const obs = buildObservation(w, "p2", 0);
+    expect(obs.self).toMatchObject({ jumpHeld: true, canJump: false, grounded: false });
+    expect(obs.self.velocity.y).toBeLessThan(0);
+    expect(GameObservationV1Schema.parse(obs).self.jumpHeld).toBe(true);
+    stepWorld(w, {
+      p1: neutralInput(w.episodeId, w.tick),
+      p2: neutralInput(w.episodeId, w.tick),
+    });
+    expect(buildObservation(w, "p2", 0).self.jumpHeld).toBe(false);
+  });
+
+  it("accepts older observations that omit held jump state", () => {
+    const obs = buildObservation(mk(), "p2", 0);
+    const legacySelf = Object.fromEntries(
+      Object.entries(obs.self).filter(([key]) => key !== "jumpHeld"),
+    );
+    expect(GameObservationV1Schema.parse({ ...obs, self: legacySelf }).self.jumpHeld).toBe(false);
+  });
+
+  it("holds mock jump through ascent and clears the tutorial ledge like a human", () => {
+    const w = mk();
+    for (const player of Object.values(w.players)) {
+      player.pos = { x: 350, y: 492 };
+      player.grounded = true;
+    }
+    const mock = new MockAIController();
+    const minY = { p1: 492, p2: 492 };
+    let released = false;
+    for (let t = 0; t < 45; t++) {
+      const inp = mock.update({
+        world: w,
+        playerId: "p2",
+        tick: w.tick,
+        episodeId: w.episodeId,
+        nowMs: t * (1000 / 60),
+      });
+      if (t === 9) expect(inp.verticalAction).toBe("jump");
+      if (t > 20 && inp.verticalAction === "none") released = true;
+      stepWorld(w, {
+        p1: input(w.episodeId, w.tick, {
+          horizontal: "right",
+          verticalAction: t < 20 ? "jump" : "none",
+        }),
+        p2: inp,
+      });
+      for (const id of ["p1", "p2"] as const) minY[id] = Math.min(minY[id], w.players[id].pos.y);
+    }
+    expect(released).toBe(true);
+    expect(492 - minY.p2).toBeGreaterThan(64);
+    expect(minY.p2).toBeCloseTo(minY.p1);
+    expect(w.players.p2.pos).toEqual(w.players.p1.pos);
+    expect(w.players.p2.pos.x).toBeGreaterThan(384 + MOVEMENT.bodyWidth / 2);
+  });
 });

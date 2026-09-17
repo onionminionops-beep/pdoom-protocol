@@ -121,12 +121,13 @@ completion time. Live JEV latency and human playtesting are needed to calibrate 
 The simulation never branches on a directive. Live JEV receives the directive text
 and server question overrides; confidence gating still applies independently.
 
-| Directive    | Mock behavior                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| SPEEDRUNNER  | Progresses right, dashes across safe stretches, fights when a gate requires it.                 |
-| COLLECTOR    | Pursues visible nearby coins and climbable side ledges, while responding to threats and health. |
-| SCORE_HUNTER | Pursues visible enemies, reevaluates every 100 ms and waits for a plausible clear shot.         |
-| GUARDIAN     | Tries to remain within 48 horizontal pixels of the teammate and prioritizes revives.            |
+| Directive      | Mock behavior                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| SPEEDRUNNER    | Progresses right, dashes across safe stretches, fights when a gate requires it.                                |
+| COLLECTOR      | Pursues visible nearby coins and climbable side ledges, while responding to threats and health.                |
+| SCORE_HUNTER   | Pursues visible enemies, reevaluates every 100 ms and waits for a plausible clear shot.                        |
+| GUARDIAN       | Tries to remain within 48 horizontal pixels of the teammate and prioritizes revives.                           |
+| MONSTER_SLAYER | Uses the same enemy-hunting Mock policy as SCORE_HUNTER; live JEV receives a dedicated combat-first directive. |
 
 Other Mock decisions generally hold for 150 ms. Observations are local and bounded;
 it can overlook a pickup, fire at the wrong height, mistime a jump, or stall on a

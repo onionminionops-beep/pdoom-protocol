@@ -65,6 +65,7 @@ export function TitleScreen({
                 }}
               />
             ))}
+            <div className="title-backdrop-shade" />
             {!logoFailed && (
               <Image
                 className="title-crest"
