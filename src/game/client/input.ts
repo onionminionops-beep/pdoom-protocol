@@ -4,6 +4,7 @@ import { ACTIONS } from "./settings";
 export class HumanInputBridge {
   private pressed = new Set<string>();
   private enabled = true;
+  private mousePressed = false;
 
   constructor(
     private controller: HumanController,
@@ -14,6 +15,8 @@ export class HumanInputBridge {
     target.addEventListener("keydown", this.keyDown);
     target.addEventListener("keyup", this.keyUp);
     target.addEventListener("blur", this.clear);
+    target.addEventListener("mousedown", this.mouseDown);
+    target.addEventListener("mouseup", this.mouseUp);
   }
 
   setEnabled(enabled: boolean): void {
@@ -28,7 +31,7 @@ export class HumanInputBridge {
 
   private synchronize(): void {
     for (const action of ACTIONS) {
-      this.controller.setKey(DEFAULT_BINDINGS[action][0], this.bindings[action].some((key) => this.pressed.has(key)));
+      this.controller.setKey(DEFAULT_BINDINGS[action][0], (action === "shoot" && this.mousePressed) || this.bindings[action].some((key) => this.pressed.has(key)));
     }
   }
 
@@ -46,7 +49,20 @@ export class HumanInputBridge {
     this.synchronize();
   };
 
+  private mouseDown = (event: MouseEvent): void => {
+    if (!this.enabled || event.button !== 0 || !(event.target instanceof HTMLCanvasElement)) return;
+    this.mousePressed = true;
+    this.synchronize();
+  };
+
+  private mouseUp = (event: MouseEvent): void => {
+    if (event.button !== 0) return;
+    this.mousePressed = false;
+    this.synchronize();
+  };
+
   clear = (): void => {
+    this.mousePressed = false;
     this.pressed.clear();
     this.synchronize();
   };
@@ -56,5 +72,7 @@ export class HumanInputBridge {
     this.target.removeEventListener("keydown", this.keyDown);
     this.target.removeEventListener("keyup", this.keyUp);
     this.target.removeEventListener("blur", this.clear);
+    this.target.removeEventListener("mousedown", this.mouseDown);
+    this.target.removeEventListener("mouseup", this.mouseUp);
   }
 }
