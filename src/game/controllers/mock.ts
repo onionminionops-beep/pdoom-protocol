@@ -68,11 +68,17 @@ export class MockAIController implements PlayerController {
       dy = health.relativePosition.y;
     }
     if (this.huntId && !obs.enemies.some((e) => e.id === this.huntId)) this.huntId = null;
-    if (this.stuckDecisions > 6 && obs.objective.type === "defeat_enemies") this.huntId ??= obs.enemies[0]?.id ?? null;
-    const obstacle = obs.enemies.find((e) => e.id === this.huntId) ??
+    if (this.stuckDecisions > 6 && obs.objective.type === "defeat_enemies")
+      this.huntId ??= obs.enemies[0]?.id ?? null;
+    const obstacle =
+      obs.enemies.find((e) => e.id === this.huntId) ??
       obs.enemies.find((e) => e.relativePosition.y > -130 || terrain.jumpWouldReachPlatform);
-    if (obstacle && (hunter || (obs.objective.type === "defeat_enemies" &&
-      (this.huntId !== null || obs.tick < this.searchUntilTick)))) {
+    if (
+      obstacle &&
+      (hunter ||
+        (obs.objective.type === "defeat_enemies" &&
+          (this.huntId !== null || obs.tick < this.searchUntilTick)))
+    ) {
       dx = obstacle.relativePosition.x;
       dy = obstacle.relativePosition.y;
     }
@@ -96,8 +102,12 @@ export class MockAIController implements PlayerController {
       fighting = false;
       input.interact = Math.hypot(dx, dy) < 50;
     }
-    const tooClose = obs.enemies.find((e) => e.type !== "consensus_engine" &&
-      Math.abs(e.relativePosition.x) < 65 && Math.abs(e.relativePosition.y) < 35);
+    const tooClose = obs.enemies.find(
+      (e) =>
+        e.type !== "consensus_engine" &&
+        Math.abs(e.relativePosition.x) < 65 &&
+        Math.abs(e.relativePosition.y) < 35,
+    );
     if (tooClose && (hunter || collector) && !sw && !teammate.downed) {
       dx = tooClose.relativePosition.x < 0 ? 120 : -120;
       fighting = false;
@@ -108,10 +118,13 @@ export class MockAIController implements PlayerController {
       input.horizontal = "neutral";
     }
 
-    input.shoot = obs.enemies.some((e) =>
-      Math.sign(e.relativePosition.x) === (self.facing === "right" ? 1 : -1) &&
-      Math.abs(e.relativePosition.x) < 400 &&
-      (hunter ? e.withinWeaponRange && e.lineOfFireClear : e.verticalAlignment === "aligned" || obs.tick % 90 < 9),
+    input.shoot = obs.enemies.some(
+      (e) =>
+        Math.sign(e.relativePosition.x) === (self.facing === "right" ? 1 : -1) &&
+        Math.abs(e.relativePosition.x) < 400 &&
+        (hunter
+          ? e.withinWeaponRange && e.lineOfFireClear
+          : e.verticalAlignment === "aligned" || obs.tick % 90 < 9),
     );
     const wall = (dx < 0 ? terrain.leftWallDistance : terrain.rightWallDistance) ?? Infinity;
     const unsafe = dx < 0 ? !terrain.safeLandingLeft : !terrain.safeLandingRight;
@@ -120,18 +133,52 @@ export class MockAIController implements PlayerController {
     if (self.grounded && !fighting && (wall < 38 || unsafe || risingGoal)) {
       input.verticalAction = "jump";
     }
-    if (self.grounded && self.onOneWayPlatform && dy > 50 && Math.abs(dx) < 50 && terrain.dropIsSafe) {
+    if (
+      self.grounded &&
+      self.onOneWayPlatform &&
+      dy > 50 &&
+      Math.abs(dx) < 50 &&
+      terrain.dropIsSafe
+    ) {
       input.verticalAction = "drop";
     }
-    if (this.stuckDecisions > 18 && Math.abs(dx) > 12 && self.grounded && !fighting && !input.interact) input.verticalAction = "jump";
-    if (speed && !fighting && !sw && !teammate.downed && !health &&
-      self.grounded && wall > 150 && !unsafe && !terrain.jumpWouldReachPlatform && self.canDash) input.dash = true;
-    if (boss && sw && boss.healthFraction <= 0.33 && boss.distance < 135 &&
-      Math.sign(dx) === Math.sign(boss.relativePosition.x) && self.canDash) input.dash = true;
-    const incoming = obs.hostileProjectiles.find((p) => p.approaching &&
-      Math.abs(p.relativePosition.x) < 80 && Math.abs(p.relativePosition.y) < 28);
+    if (
+      this.stuckDecisions > 18 &&
+      Math.abs(dx) > 12 &&
+      self.grounded &&
+      !fighting &&
+      !input.interact
+    )
+      input.verticalAction = "jump";
+    if (
+      speed &&
+      !fighting &&
+      !sw &&
+      !teammate.downed &&
+      !health &&
+      self.grounded &&
+      wall > 150 &&
+      !unsafe &&
+      !terrain.jumpWouldReachPlatform &&
+      self.canDash
+    )
+      input.dash = true;
+    if (
+      boss &&
+      sw &&
+      boss.healthFraction <= 0.33 &&
+      boss.distance < 135 &&
+      Math.sign(dx) === Math.sign(boss.relativePosition.x) &&
+      self.canDash
+    )
+      input.dash = true;
+    const incoming = obs.hostileProjectiles.find(
+      (p) =>
+        p.approaching && Math.abs(p.relativePosition.x) < 80 && Math.abs(p.relativePosition.y) < 28,
+    );
     if (incoming && self.grounded && !input.interact) input.verticalAction = "jump";
-    if (obs.interactables.some((i) => i.type === "exit" && i.inRange) && !boss) input.interact = true;
+    if (obs.interactables.some((i) => i.type === "exit" && i.inRange) && !boss)
+      input.interact = true;
     return input;
   }
 

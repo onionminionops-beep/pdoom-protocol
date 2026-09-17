@@ -9,8 +9,12 @@ export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
   const dt = TICK_MS / 1000;
   const remaining = [];
   for (const pr of world.projectiles) {
-    const source = pr.ownerKind === "enemy" ? world.enemies.find((e) => e.id === pr.ownerId) : undefined;
-    if (pr.ownerKind === "enemy" && (!source || roomAt(world.level, pr.pos)?.id !== source.roomId)) {
+    const source =
+      pr.ownerKind === "enemy" ? world.enemies.find((e) => e.id === pr.ownerId) : undefined;
+    if (
+      pr.ownerKind === "enemy" &&
+      (!source || roomAt(world.level, pr.pos)?.id !== source.roomId)
+    ) {
       events.push({ type: "projectile_expired", projectileId: pr.id, pos: { ...pr.pos } });
       continue;
     }
@@ -35,7 +39,13 @@ export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
           if (pr.blastRadius > 0) explode(world, pr, events);
           else {
             damageEnemy(world, e, pr.damage, pr.ownerId as PlayerId, events);
-            events.push({ type: "projectile_hit", projectileId: pr.id, targetId: e.id, pos: { ...pr.pos }, damage: pr.damage });
+            events.push({
+              type: "projectile_hit",
+              projectileId: pr.id,
+              targetId: e.id,
+              pos: { ...pr.pos },
+              damage: pr.damage,
+            });
           }
           dead = true;
           break;
@@ -44,11 +54,23 @@ export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
     } else if (!dead && pr.ownerKind === "enemy") {
       for (const pid of ["p1", "p2"] as const) {
         const p = world.players[pid];
-        if (world.slots[pid] === "DISABLED" || !p.alive || p.downed ||
-          !source || !visibleFrom(world.level, p.pos, source.pos)) continue;
+        if (
+          world.slots[pid] === "DISABLED" ||
+          !p.alive ||
+          p.downed ||
+          !source ||
+          !visibleFrom(world.level, p.pos, source.pos)
+        )
+          continue;
         if (circleAABBOverlap(pr.pos.x, pr.pos.y, pr.radius, playerBox(p))) {
           damagePlayer(p, pr.damage, pr.ownerId, pr.vel.x > 0 ? "right" : "left", events);
-          events.push({ type: "projectile_hit", projectileId: pr.id, targetId: pid, pos: { ...pr.pos }, damage: pr.damage });
+          events.push({
+            type: "projectile_hit",
+            projectileId: pr.id,
+            targetId: pid,
+            pos: { ...pr.pos },
+            damage: pr.damage,
+          });
           dead = true;
           break;
         }
@@ -59,7 +81,11 @@ export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
   world.projectiles = remaining;
 }
 
-function explode(world: WorldState, pr: WorldState["projectiles"][number], events: SimEvent[]): void {
+function explode(
+  world: WorldState,
+  pr: WorldState["projectiles"][number],
+  events: SimEvent[],
+): void {
   events.push({ type: "explosion", pos: { ...pr.pos }, radius: pr.blastRadius });
   for (const e of world.enemies) {
     if (e.health <= 0) continue;
@@ -71,7 +97,13 @@ function explode(world: WorldState, pr: WorldState["projectiles"][number], event
   if (pr.ownerKind === "player" && pr.selfDamageFraction > 0) {
     const owner = world.players[pr.ownerId as PlayerId];
     if (circleAABBOverlap(pr.pos.x, pr.pos.y, pr.blastRadius, playerBox(owner))) {
-      damagePlayer(owner, Math.round(pr.damage * pr.selfDamageFraction), "self", pr.pos.x < owner.pos.x ? "right" : "left", events);
+      damagePlayer(
+        owner,
+        Math.round(pr.damage * pr.selfDamageFraction),
+        "self",
+        pr.pos.x < owner.pos.x ? "right" : "left",
+        events,
+      );
     }
   }
 }

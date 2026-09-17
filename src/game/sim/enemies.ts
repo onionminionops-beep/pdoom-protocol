@@ -10,7 +10,15 @@ export function enemyBox(e: EnemyState): AABB {
   return { x: e.pos.x, y: e.pos.y, w: e.w, h: e.h };
 }
 
-export function spawnEnemy(world: WorldState, id: string, type: EnemyType, x: number, y: number, roomId: string, facing: "left" | "right" = "left"): EnemyState {
+export function spawnEnemy(
+  world: WorldState,
+  id: string,
+  type: EnemyType,
+  x: number,
+  y: number,
+  roomId: string,
+  facing: "left" | "right" = "left",
+): EnemyState {
   const def = ENEMY_DEFS[type];
   const e: EnemyState = {
     id,
@@ -37,7 +45,13 @@ export function spawnEnemy(world: WorldState, id: string, type: EnemyType, x: nu
   return e;
 }
 
-export function damageEnemy(world: WorldState, e: EnemyState, amount: number, by: PlayerId, events: SimEvent[]): void {
+export function damageEnemy(
+  world: WorldState,
+  e: EnemyState,
+  amount: number,
+  by: PlayerId,
+  events: SimEvent[],
+): void {
   if (e.health <= 0) return;
   if (e.type === "consensus_engine" && world.bossPhase === 3 && e.phase !== "special") return;
   const def = ENEMY_DEFS[e.type];
@@ -53,7 +67,13 @@ export function damageEnemy(world: WorldState, e: EnemyState, amount: number, by
     e.bubble = null;
     world.score += def.score;
     world.breakdown.kills += def.score;
-    events.push({ type: "enemy_killed", enemyId: e.id, enemyType: e.type, pos: { ...e.pos }, score: def.score });
+    events.push({
+      type: "enemy_killed",
+      enemyId: e.id,
+      enemyType: e.type,
+      pos: { ...e.pos },
+      score: def.score,
+    });
     void by;
   }
 }
@@ -80,9 +100,12 @@ export function stepEnemies(world: WorldState, events: SimEvent[]): void {
       if (e.phaseMs < ENEMY_DEFS[e.type].deathMs) alive.push(e);
       continue;
     }
-    const visible = (["p1", "p2"] as const).some((id) =>
-      world.slots[id] !== "DISABLED" && world.players[id].alive &&
-      !world.players[id].downed && visibleFrom(world.level, world.players[id].pos, e.pos),
+    const visible = (["p1", "p2"] as const).some(
+      (id) =>
+        world.slots[id] !== "DISABLED" &&
+        world.players[id].alive &&
+        !world.players[id].downed &&
+        visibleFrom(world.level, world.players[id].pos, e.pos),
     );
     if (!visible) {
       e.vel = { x: 0, y: 0 };

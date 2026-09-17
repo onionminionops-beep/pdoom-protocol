@@ -1,8 +1,20 @@
 import { MOVEMENT, TILE } from "../config/movement";
 import { WEAPONS } from "../config/weapons";
 import { DIRECTIVES } from "../contracts/directives";
-import { GameObservationV1Schema, OBSERVATION_LIMITS, type GameObservationV1, type ObservedEnemy, type ObservedProjectile } from "../contracts/observation";
-import { distanceToCeiling, distanceToGround, distanceToWall, horizontalLineClear, tileAt } from "../sim/physics";
+import {
+  GameObservationV1Schema,
+  OBSERVATION_LIMITS,
+  type GameObservationV1,
+  type ObservedEnemy,
+  type ObservedProjectile,
+} from "../contracts/observation";
+import {
+  distanceToCeiling,
+  distanceToGround,
+  distanceToWall,
+  horizontalLineClear,
+  tileAt,
+} from "../sim/physics";
 import { otherPlayerId } from "../sim/player";
 import type { EnemyState, PlayerId, PlayerState, ProjectileState, WorldState } from "../sim/types";
 import { INTERACT_RANGE_PX, REVIVE_RANGE_PX } from "../sim/step";
@@ -17,7 +29,11 @@ const WALL_PROBE = 160;
  * enemy state. No rendering info, no human input, no future state.
  * Deterministic: same world => same observation (timestamp aside).
  */
-export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, timestampMs: number): GameObservationV1 {
+export function buildObservation(
+  world: Readonly<WorldState>,
+  selfId: PlayerId,
+  timestampMs: number,
+): GameObservationV1 {
   const self = world.players[selfId];
   const mate = world.players[otherPlayerId(selfId)];
   const mateDisabled = world.slots[otherPlayerId(selfId)] === "DISABLED";
@@ -39,16 +55,19 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
   const nearLeftEdge = self.grounded && !hasGroundAt(world, self.pos.x - hw - 4, self.pos.y + hh);
   const nearRightEdge = self.grounded && !hasGroundAt(world, self.pos.x + hw + 4, self.pos.y + hh);
   const jumpWouldReachPlatform = platformReachableAbove(world, self);
-  const dropIsSafe = self.onOneWayPlatform && landingSafe(world, self.pos.x, self.pos.y + hh + TILE);
+  const dropIsSafe =
+    self.onOneWayPlatform && landingSafe(world, self.pos.x, self.pos.y + hh + TILE);
 
   // ---- enemies
   const enemies: ObservedEnemy[] = world.enemies
     .filter((e) => e.health > 0 && e.phase !== "dying" && visibleFrom(level, self.pos, e.pos))
     .map((e) => describeEnemy(world, self, e, weapon.rangePx))
     .filter((e) => e.distance < 900)
-    .sort((a, b) =>
-      (a.estimatedTimeToContactMs ?? Infinity) - (b.estimatedTimeToContactMs ?? Infinity) ||
-      a.distance - b.distance || a.id.localeCompare(b.id),
+    .sort(
+      (a, b) =>
+        (a.estimatedTimeToContactMs ?? Infinity) - (b.estimatedTimeToContactMs ?? Infinity) ||
+        a.distance - b.distance ||
+        a.id.localeCompare(b.id),
     )
     .slice(0, OBSERVATION_LIMITS.enemies);
 
@@ -61,9 +80,12 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
       const ta = a.estimatedTimeToClosestApproachMs ?? 1e9;
       const tb = b.estimatedTimeToClosestApproachMs ?? 1e9;
       if (a.approaching !== b.approaching) return a.approaching ? -1 : 1;
-      return ta - tb ||
-        Math.hypot(a.relativePosition.x, a.relativePosition.y) - Math.hypot(b.relativePosition.x, b.relativePosition.y) ||
-        a.id.localeCompare(b.id);
+      return (
+        ta - tb ||
+        Math.hypot(a.relativePosition.x, a.relativePosition.y) -
+          Math.hypot(b.relativePosition.x, b.relativePosition.y) ||
+        a.id.localeCompare(b.id)
+      );
     })
     .slice(0, OBSERVATION_LIMITS.hostileProjectiles);
 
@@ -78,7 +100,9 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
         value: p.value,
         relativePosition: r,
         distance: Math.hypot(r.x, r.y),
-        pathAppearsSafe: horizontalLineClear(level, self.pos.x, p.pos.x, self.pos.y) && !hazardBetween(world, self.pos.x, p.pos.x, self.pos.y + hh),
+        pathAppearsSafe:
+          horizontalLineClear(level, self.pos.x, p.pos.x, self.pos.y) &&
+          !hazardBetween(world, self.pos.x, p.pos.x, self.pos.y + hh),
       };
     })
     .filter((p) => p.distance < 700)
@@ -88,14 +112,20 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
   // ---- interactables
   const interactables = world.interactables
     .filter((it) => !(it.type === "weapon_crate" && it.activated))
-    .filter((it) => (!it.requiredPlayer || it.requiredPlayer === selfId) && visibleFrom(level, self.pos, it.pos))
+    .filter(
+      (it) =>
+        (!it.requiredPlayer || it.requiredPlayer === selfId) &&
+        visibleFrom(level, self.pos, it.pos),
+    )
     .map((it) => {
       const r = rel(it.pos);
       return {
         id: it.id,
         type: it.type,
         relativePosition: r,
-        inRange: Math.abs(r.x) < it.w / 2 + INTERACT_RANGE_PX / 2 + hw && Math.abs(r.y) < it.h / 2 + INTERACT_RANGE_PX / 2 + hh,
+        inRange:
+          Math.abs(r.x) < it.w / 2 + INTERACT_RANGE_PX / 2 + hw &&
+          Math.abs(r.y) < it.h / 2 + INTERACT_RANGE_PX / 2 + hh,
         activated: it.activated,
         distance: Math.hypot(r.x, r.y),
       };
@@ -103,29 +133,48 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
     .filter((it) => it.distance < 900)
     .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id))
     .slice(0, OBSERVATION_LIMITS.interactables)
-    .map((it) => ({ id: it.id, type: it.type, relativePosition: it.relativePosition, inRange: it.inRange, activated: it.activated }));
+    .map((it) => ({
+      id: it.id,
+      type: it.type,
+      relativePosition: it.relativePosition,
+      inRange: it.inRange,
+      activated: it.activated,
+    }));
 
   // ---- teammate
   const mateRel = rel(mate.pos);
-  const mateNearEnemies = world.enemies.filter((e) => e.health > 0 && Math.hypot(e.pos.x - mate.pos.x, e.pos.y - mate.pos.y) < 120).length;
-  const mateDanger = world.projectiles.some((p) => p.ownerKind === "enemy" && Math.hypot(p.pos.x - mate.pos.x, p.pos.y - mate.pos.y) < 90) || mateNearEnemies >= 1;
+  const mateNearEnemies = world.enemies.filter(
+    (e) => e.health > 0 && Math.hypot(e.pos.x - mate.pos.x, e.pos.y - mate.pos.y) < 120,
+  ).length;
+  const mateDanger =
+    world.projectiles.some(
+      (p) => p.ownerKind === "enemy" && Math.hypot(p.pos.x - mate.pos.x, p.pos.y - mate.pos.y) < 90,
+    ) || mateNearEnemies >= 1;
   const mateNeedsRevive = !mateDisabled && mate.alive && mate.downed;
   const mateInReviveRange = Math.hypot(mateRel.x, mateRel.y) < REVIVE_RANGE_PX + MOVEMENT.bodyWidth;
 
   // ---- tactical
-  const imminent = hostileProjectiles.filter((p) => p.approaching && (p.estimatedTimeToClosestApproachMs ?? 1e9) < 700).length;
+  const imminent = hostileProjectiles.filter(
+    (p) => p.approaching && (p.estimatedTimeToClosestApproachMs ?? 1e9) < 700,
+  ).length;
   const closeEnemies = enemies.filter((e) => e.distance < 140).length;
-  const dangerLevel = self.health <= 25 && (closeEnemies > 0 || imminent > 0)
-    ? "critical"
-    : closeEnemies >= 2 || imminent >= 2
-      ? "high"
-      : closeEnemies === 1 || imminent === 1
-        ? "medium"
-        : "low";
-  const clearShotLeft = enemies.some((e) => e.horizontalSide === "left" && e.lineOfFireClear && e.verticalAlignment === "aligned");
-  const clearShotRight = enemies.some((e) => e.horizontalSide === "right" && e.lineOfFireClear && e.verticalAlignment === "aligned");
+  const dangerLevel =
+    self.health <= 25 && (closeEnemies > 0 || imminent > 0)
+      ? "critical"
+      : closeEnemies >= 2 || imminent >= 2
+        ? "high"
+        : closeEnemies === 1 || imminent === 1
+          ? "medium"
+          : "low";
+  const clearShotLeft = enemies.some(
+    (e) => e.horizontalSide === "left" && e.lineOfFireClear && e.verticalAlignment === "aligned",
+  );
+  const clearShotRight = enemies.some(
+    (e) => e.horizontalSide === "right" && e.lineOfFireClear && e.verticalAlignment === "aligned",
+  );
 
-  const anyInteractInRange = interactables.some((i) => i.inRange && !i.activated) || (mateNeedsRevive && mateInReviveRange);
+  const anyInteractInRange =
+    interactables.some((i) => i.inRange && !i.activated) || (mateNeedsRevive && mateInReviveRange);
   const directive = DIRECTIVES[world.directive];
 
   const obs: GameObservationV1 = {
@@ -151,7 +200,12 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
       downed: self.downed,
       weapon: self.weapon,
       ammunition: self.ammo[self.weapon],
-      canShoot: self.alive && !self.downed && self.fireCooldownMs <= 0 && self.dashTimeMs <= 0 && (self.ammo[self.weapon] ?? 1) > 0,
+      canShoot:
+        self.alive &&
+        !self.downed &&
+        self.fireCooldownMs <= 0 &&
+        self.dashTimeMs <= 0 &&
+        (self.ammo[self.weapon] ?? 1) > 0,
       canJump: self.alive && !self.downed && (self.grounded || self.coyoteMs > 0),
       canDash: self.alive && !self.downed && self.dashCooldownMs <= 0 && self.dashTimeMs <= 0,
       dashCooldownMs: self.dashCooldownMs,
@@ -203,20 +257,33 @@ export function buildObservation(world: Readonly<WorldState>, selfId: PlayerId, 
   return GameObservationV1Schema.parse(obs);
 }
 
-function describeEnemy(world: Readonly<WorldState>, self: PlayerState, e: EnemyState, weaponRange: number): ObservedEnemy {
+function describeEnemy(
+  world: Readonly<WorldState>,
+  self: PlayerState,
+  e: EnemyState,
+  weaponRange: number,
+): ObservedEnemy {
   const r = { x: e.pos.x - self.pos.x, y: e.pos.y - self.pos.y };
   const distance = Math.hypot(r.x, r.y);
   const halfSum = MOVEMENT.bodyWidth / 2 + e.w / 2;
   const horizontalSide = Math.abs(r.x) < halfSum ? "overlapping" : r.x < 0 ? "left" : "right";
   const dy = r.y;
   const aligned = Math.abs(dy + 4) < e.h / 2 + WEAPONS[self.weapon].projectileRadius;
-  const verticalAlignment =
-    aligned ? "aligned" : dy < 0 ? (dy > -80 ? "slightly_above" : "far_above") : dy < 80 ? "slightly_below" : "far_below";
+  const verticalAlignment = aligned
+    ? "aligned"
+    : dy < 0
+      ? dy > -80
+        ? "slightly_above"
+        : "far_above"
+      : dy < 80
+        ? "slightly_below"
+        : "far_below";
   const lineOfFireClear = horizontalLineClear(world.level, self.pos.x, e.pos.x, self.pos.y - 4);
   const facingSelf = (e.facing === "right" && r.x < 0) || (e.facing === "left" && r.x > 0);
   const relVel = { x: e.vel.x - self.vel.x, y: e.vel.y - self.vel.y };
   const closingSpeed = -(r.x * relVel.x + r.y * relVel.y) / Math.max(1, distance);
-  const estimatedTimeToContactMs = closingSpeed > 5 ? Math.max(0, Math.round(((distance - halfSum) / closingSpeed) * 1000)) : null;
+  const estimatedTimeToContactMs =
+    closingSpeed > 5 ? Math.max(0, Math.round(((distance - halfSum) / closingSpeed) * 1000)) : null;
   return {
     id: e.id,
     type: e.type,
@@ -281,7 +348,12 @@ function landingSafe(world: Readonly<WorldState>, x: number, yBottom: number): b
   return false;
 }
 
-function hazardBetween(world: Readonly<WorldState>, x0: number, x1: number, yBottom: number): boolean {
+function hazardBetween(
+  world: Readonly<WorldState>,
+  x0: number,
+  x1: number,
+  yBottom: number,
+): boolean {
   const a = Math.floor(Math.min(x0, x1) / TILE);
   const b = Math.floor(Math.max(x0, x1) / TILE);
   const ty = Math.floor((yBottom + 1) / TILE);
@@ -301,7 +373,11 @@ function platformReachableAbove(world: Readonly<WorldState>, self: PlayerState):
       const k = tileAt(world.level, tx, ty);
       if (k === "oneway" || k === "solid") {
         // must have headroom above the platform
-        if (tileAt(world.level, tx, ty - 1) === "empty" && tileAt(world.level, tx, ty - 2) === "empty") return true;
+        if (
+          tileAt(world.level, tx, ty - 1) === "empty" &&
+          tileAt(world.level, tx, ty - 2) === "empty"
+        )
+          return true;
         break;
       }
     }
