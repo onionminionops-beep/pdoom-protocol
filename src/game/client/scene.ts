@@ -140,6 +140,21 @@ export class ProtocolScene extends Phaser.Scene {
       this.rect(x + 32, 301, 6, 210, 0x142239);
       this.rect(x + 188, 301, 6, 210, 0x142239);
     }
+    for (const room of world.level.rooms) {
+      if (room.gateTileX === null || world.openedGates[room.id]) continue;
+      const x = (room.gateTileX + 0.5) * TILE;
+      if (x < camera.x || x > camera.x + camera.width) continue;
+      const y = (room.bounds[3] - 5) * TILE;
+      this.label(x, y, "LOCKED GATE", "#ffca72", 12, true);
+      this.label(
+        x,
+        y + 30,
+        room.gateOnEnemies ? "CLEAR ROOM TO OPEN" : "ACTIVATE BOTH SWITCHES",
+        "#edf6ff",
+        10,
+        true,
+      );
+    }
     for (const zone of world.restrictedZones) {
       this.drawing.fillStyle(0xffb347, 0.12).fillRect(zone.x, zone.y, zone.w, zone.h);
       this.drawing.lineStyle(2, 0xffb347, 0.8).strokeRect(zone.x, zone.y, zone.w, zone.h);
