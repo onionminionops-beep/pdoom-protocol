@@ -49,7 +49,7 @@ export class MockAIController implements PlayerController {
 
     // Directive-flavoured goal choice (all via observation only)
     const wantCoins = obs.directive.id === "COLLECTOR";
-    const wantKills = obs.directive.id === "SCORE_HUNTER";
+    const wantKills = obs.directive.id === "SCORE_HUNTER" || obs.directive.id === "MONSTER_SLAYER";
     const guardian = obs.directive.id === "GUARDIAN";
     const coin = obs.pickups.find((p) => p.type === "coin");
     const teammate = obs.teammate;
