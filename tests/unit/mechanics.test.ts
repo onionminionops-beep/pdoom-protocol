@@ -86,9 +86,17 @@ describe("co-op mechanics", () => {
     const level = flatLevel();
     level.spawns.p2 = [10, 15];
     level.rooms[0].gateTileX = 20;
-    level.rows = level.rows.map((row, y) => y < 16 ? `${row.slice(0, 20)}G${row.slice(21)}` : row);
+    level.rows = level.rows.map((row, y) =>
+      y < 16 ? `${row.slice(0, 20)}G${row.slice(21)}` : row,
+    );
     level.interactables = (["p1", "p2"] as const).map((id) => ({
-      id, type: "switch", tileX: 10, tileY: 15, roomId: "arena", requiredPlayer: id, label: id,
+      id,
+      type: "switch",
+      tileX: 10,
+      tileY: 15,
+      roomId: "arena",
+      requiredPlayer: id,
+      label: id,
     }));
     const world = arena({ level });
     advance(world, 100, { interact: true });
@@ -100,32 +108,48 @@ describe("co-op mechanics", () => {
     expect(level.rows[15][20]).toBe("G");
   });
 
-  it.each(["catastrophe_prophet", "datacenter_blockader", "purity_enforcer", "consensus_engine"] as const)(
-    "%s cannot damage players from another room or beyond visible range",
-    (type) => {
-      for (const otherRoom of [false, true]) {
-        const level = flatLevel();
-        if (otherRoom) {
-          level.rooms[0].bounds[2] = 12;
-          level.rooms.push({ ...level.rooms[0], id: "outside", bounds: [12, 0, 96, 18] });
-        }
-        const world = arena({ level });
-        const p = world.players.p1;
-        const enemy = spawnEnemy(world, "ranged", type, p.pos.x + (otherRoom ? 3 * TILE : 600), p.pos.y, otherRoom ? "outside" : "arena");
-        const events = advance(world, 600);
-        expect(events.some((e) => e.type === "enemy_attack")).toBe(false);
-        fireEnemyProjectile(world, enemy, "enemy_bubble", { x: -200, y: 0 }, 10, 6, 2000);
-        advance(world, 300);
-        expect(world.players.p1.health).toBe(100);
-        expect(world.players.p2.health).toBe(100);
+  it.each([
+    "catastrophe_prophet",
+    "datacenter_blockader",
+    "purity_enforcer",
+    "consensus_engine",
+  ] as const)("%s cannot damage players from another room or beyond visible range", (type) => {
+    for (const otherRoom of [false, true]) {
+      const level = flatLevel();
+      if (otherRoom) {
+        level.rooms[0].bounds[2] = 12;
+        level.rooms.push({ ...level.rooms[0], id: "outside", bounds: [12, 0, 96, 18] });
       }
-    },
-  );
+      const world = arena({ level });
+      const p = world.players.p1;
+      const enemy = spawnEnemy(
+        world,
+        "ranged",
+        type,
+        p.pos.x + (otherRoom ? 3 * TILE : 600),
+        p.pos.y,
+        otherRoom ? "outside" : "arena",
+      );
+      const events = advance(world, 600);
+      expect(events.some((e) => e.type === "enemy_attack")).toBe(false);
+      fireEnemyProjectile(world, enemy, "enemy_bubble", { x: -200, y: 0 }, 10, 6, 2000);
+      advance(world, 300);
+      expect(world.players.p1.health).toBe(100);
+      expect(world.players.p2.health).toBe(100);
+    }
+  });
 
   it("allows an on-screen ranged attack to hurt a player", () => {
     const world = arena({ slots: { p1: "HUMAN", p2: "DISABLED" } });
     const p = world.players.p1;
-    const enemy = spawnEnemy(world, "ranged", "datacenter_blockader", p.pos.x + 200, p.pos.y, "arena");
+    const enemy = spawnEnemy(
+      world,
+      "ranged",
+      "datacenter_blockader",
+      p.pos.x + 200,
+      p.pos.y,
+      "arena",
+    );
     fireEnemyProjectile(world, enemy, "enemy_bubble", { x: -200, y: 0 }, 10, 6, 1000);
     advance(world, 90);
     expect(p.health).toBeLessThan(100);

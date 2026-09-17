@@ -54,7 +54,9 @@ describe("shared physics and fair inputs", () => {
             ...neutralInput("arena", tick),
             horizontal: (["left", "neutral", "right"] as const)[r.value % 3],
             verticalAction: (["none", "jump", "drop"] as const)[(r.value >> 2) % 3],
-            shoot: !!(r.value & 32), dash: !!(r.value & 64), interact: !!(r.value & 128),
+            shoot: !!(r.value & 32),
+            dash: !!(r.value & 64),
+            interact: !!(r.value & 128),
           };
         }
         const previousFacing = a.players.p1.facing;
@@ -67,34 +69,40 @@ describe("shared physics and fair inputs", () => {
     }
   });
 
-  it.each(["blaster", "shotgun", "launcher"] as const)("%s has a fixed muzzle, spread and direction independent of targets", (weapon) => {
-    for (const id of ["p1", "p2"] as const) {
-      for (const facing of ["left", "right"] as const) {
-        const shots = [-200, 0, 200].map((dy) => {
-          const world = arena();
-          const p = world.players[id];
-          p.weapon = weapon;
-          p.facing = facing;
-          spawnEnemy(world, "target", "doom_prophet", p.pos.x + 100, p.pos.y + dy, "arena");
-          tryShoot(world, p, { ...neutralInput("arena", 0), shoot: true }, []);
-          const dir = facing === "left" ? -1 : 1;
-          const def = WEAPONS[weapon];
-          expect(world.projectiles).toHaveLength(def.pellets);
-          for (const [i, pr] of world.projectiles.entries()) {
-            expect(pr.pos).toEqual({ x: p.pos.x + dir * (MOVEMENT.bodyWidth / 2 + 6), y: p.pos.y - 4 });
-            expect(pr.vel).toEqual({
-              x: dir * def.projectileSpeed,
-              y: def.pellets === 1 ? 0 : (i / (def.pellets - 1) - 0.5) * 2 * def.spreadVy,
-            });
-          }
-          expect(p.facing).toBe(facing);
-          return world.projectiles;
-        });
-        expect(shots[0]).toEqual(shots[1]);
-        expect(shots[1]).toEqual(shots[2]);
+  it.each(["blaster", "shotgun", "launcher"] as const)(
+    "%s has a fixed muzzle, spread and direction independent of targets",
+    (weapon) => {
+      for (const id of ["p1", "p2"] as const) {
+        for (const facing of ["left", "right"] as const) {
+          const shots = [-200, 0, 200].map((dy) => {
+            const world = arena();
+            const p = world.players[id];
+            p.weapon = weapon;
+            p.facing = facing;
+            spawnEnemy(world, "target", "doom_prophet", p.pos.x + 100, p.pos.y + dy, "arena");
+            tryShoot(world, p, { ...neutralInput("arena", 0), shoot: true }, []);
+            const dir = facing === "left" ? -1 : 1;
+            const def = WEAPONS[weapon];
+            expect(world.projectiles).toHaveLength(def.pellets);
+            for (const [i, pr] of world.projectiles.entries()) {
+              expect(pr.pos).toEqual({
+                x: p.pos.x + dir * (MOVEMENT.bodyWidth / 2 + 6),
+                y: p.pos.y - 4,
+              });
+              expect(pr.vel).toEqual({
+                x: dir * def.projectileSpeed,
+                y: def.pellets === 1 ? 0 : (i / (def.pellets - 1) - 0.5) * 2 * def.spreadVy,
+              });
+            }
+            expect(p.facing).toBe(facing);
+            return world.projectiles;
+          });
+          expect(shots[0]).toEqual(shots[1]);
+          expect(shots[1]).toEqual(shots[2]);
+        }
       }
-    }
-  });
+    },
+  );
 
   it("holds only contract inputs, never mutates a deeply frozen world, and exposes no extra observation fields", () => {
     const world = arena({ level: CONSENSUS_HEIGHTS });
@@ -104,15 +112,27 @@ describe("shared physics and fair inputs", () => {
       if (tick % 60 === 0) {
         const copy = freeze(structuredClone(world));
         const guarded = new Proxy(copy, {
-          set() { throw new Error("world mutation"); },
-          deleteProperty() { throw new Error("world mutation"); },
-          defineProperty() { throw new Error("world mutation"); },
+          set() {
+            throw new Error("world mutation");
+          },
+          deleteProperty() {
+            throw new Error("world mutation");
+          },
+          defineProperty() {
+            throw new Error("world mutation");
+          },
         });
         const before = JSON.stringify(guarded);
         const obs = buildObservation(guarded, "p2", world.elapsedMs);
         expect(obs).toEqual(GameObservationV1Schema.parse(obs));
         for (const offset of [0, 1]) {
-          const input = mock.update({ world: guarded, playerId: "p2", episodeId: world.episodeId, tick: world.tick + offset, nowMs: world.elapsedMs });
+          const input = mock.update({
+            world: guarded,
+            playerId: "p2",
+            episodeId: world.episodeId,
+            tick: world.tick + offset,
+            nowMs: world.elapsedMs,
+          });
           expect(input).toEqual(PlayerInputV1Schema.parse(input));
         }
         expect(JSON.stringify(guarded)).toBe(before);
@@ -124,11 +144,21 @@ describe("shared physics and fair inputs", () => {
   it("neutralizes every axis of stale episode inputs", () => {
     const a = arena();
     const b = arena();
-    advance(a, 120, { episodeId: "stale", horizontal: "right", verticalAction: "jump", shoot: true, dash: true, interact: true });
+    advance(a, 120, {
+      episodeId: "stale",
+      horizontal: "right",
+      verticalAction: "jump",
+      shoot: true,
+      dash: true,
+      interact: true,
+    });
     advance(b, 120);
     expect(a).toEqual({
       ...b,
-      players: { ...b.players, p1: { ...b.players.p1, lastInput: neutralInput(b.episodeId, a.tick) } },
+      players: {
+        ...b.players,
+        p1: { ...b.players.p1, lastInput: neutralInput(b.episodeId, a.tick) },
+      },
     });
   });
 
@@ -144,23 +174,38 @@ describe("shared physics and fair inputs", () => {
 });
 
 describe("seeded replay", () => {
-  it.each([false, true])("is identical after 5000 ticks (different episode IDs: %s)", (differentEpisodes) => {
-    const options = { level: CONSENSUS_HEIGHTS, seed: 42, episodeId: "first", directive: "SPEEDRUNNER" as const, slots: { p1: "HUMAN" as const, p2: "MOCK_AI" as const } };
-    const a = createWorld(options);
-    const b = createWorld({ ...options, episodeId: differentEpisodes ? "fresh-episode" : options.episodeId });
-    const driver = scriptedDriver();
-    expect(a.rngState).toBe(b.rngState);
-    for (let tick = 0; tick < 5000; tick++) {
-      const inputs = { p1: driver(a, "p1"), p2: driver(a, "p2") };
-      stepWorld(a, inputs);
-      stepWorld(b, { p1: { ...inputs.p1, episodeId: b.episodeId }, p2: { ...inputs.p2, episodeId: b.episodeId } });
-    }
-    expect(a.tick).toBe(5000);
-    expect(a.status).toBe("won");
-    expect(JSON.stringify(comparableEpisode(a))).toBe(JSON.stringify(comparableEpisode(b)));
-    if (!differentEpisodes) expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    expect(a.rngState).not.toBe(42);
-  });
+  it.each([false, true])(
+    "is identical after 5000 ticks (different episode IDs: %s)",
+    (differentEpisodes) => {
+      const options = {
+        level: CONSENSUS_HEIGHTS,
+        seed: 42,
+        episodeId: "first",
+        directive: "SPEEDRUNNER" as const,
+        slots: { p1: "HUMAN" as const, p2: "MOCK_AI" as const },
+      };
+      const a = createWorld(options);
+      const b = createWorld({
+        ...options,
+        episodeId: differentEpisodes ? "fresh-episode" : options.episodeId,
+      });
+      const driver = scriptedDriver();
+      expect(a.rngState).toBe(b.rngState);
+      for (let tick = 0; tick < 5000; tick++) {
+        const inputs = { p1: driver(a, "p1"), p2: driver(a, "p2") };
+        stepWorld(a, inputs);
+        stepWorld(b, {
+          p1: { ...inputs.p1, episodeId: b.episodeId },
+          p2: { ...inputs.p2, episodeId: b.episodeId },
+        });
+      }
+      expect(a.tick).toBe(5000);
+      expect(a.status).toBe("won");
+      expect(JSON.stringify(comparableEpisode(a))).toBe(JSON.stringify(comparableEpisode(b)));
+      if (!differentEpisodes) expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+      expect(a.rngState).not.toBe(42);
+    },
+  );
 
   it("keeps seed zero distinct from seed one", () => {
     expect(arena({ seed: 0 }).rngState).toBe(0);
