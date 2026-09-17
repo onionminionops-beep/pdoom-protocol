@@ -31,6 +31,8 @@ export interface JevStatus {
   consecutiveFailures: number;
   requestsSent: number;
   lastError: string | null;
+  minDecisionIntervalMs?: number;
+  lastRoundTripMs?: number | null;
 }
 
 export interface JevLastDecision extends DecisionResponse {
@@ -57,6 +59,7 @@ export class JevController implements PlayerController {
   private sessionRequests = 0;
   private input: PlayerInputV1 | null = null;
   private inputObservedAt = -Infinity;
+  private inputAcceptedAt = -Infinity;
   private lastDecision: JevLastDecision | null = null;
   private inFlight = false;
   private abort: AbortController | null = null;
@@ -70,6 +73,8 @@ export class JevController implements PlayerController {
     consecutiveFailures: 0,
     requestsSent: 0,
     lastError: null,
+    minDecisionIntervalMs: AI_CONFIG.minIntervalMs,
+    lastRoundTripMs: null,
   };
 
   constructor(private readonly opts: JevControllerOptions = {}) {
@@ -145,7 +150,7 @@ export class JevController implements PlayerController {
     const backoff = this.fallback
       ? AI_CONFIG.retryLiveAfterMs
       : AI_CONFIG.minIntervalMs * 2 ** Math.min(failures, 6);
-    this.nextRequestAt = this.now() + Math.max(backoff, detail?.retryAfterMs ?? 0);
+    this.nextRequestAt = Math.max(this.nextRequestAt, this.now() + Math.max(backoff, detail?.retryAfterMs ?? 0));
     this.publish({
       mode: this.fallback ? "fallback_mock" : "error",
       consecutiveFailures: failures,
@@ -167,7 +172,10 @@ export class JevController implements PlayerController {
       this.sessionExpiresAt = this.now() + (session.expiresAt - Date.now());
       this.sessionRequests = 0;
       this.nextRequestAt = Math.max(this.nextRequestAt, started + AI_CONFIG.minIntervalMs);
-      this.publish({ mode: this.fallback ? "fallback_mock" : "waiting" });
+      this.publish({
+        mode: this.fallback ? "fallback_mock" : "waiting",
+        minDecisionIntervalMs: Math.max(AI_CONFIG.minIntervalMs, session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs),
+      });
     } catch (error) {
       if (!this.disposed && generation === this.generation) this.failed(error);
     } finally {
@@ -181,6 +189,7 @@ export class JevController implements PlayerController {
     this.inFlight = true;
     const generation = this.generation;
     const started = this.now();
+    this.nextRequestAt = started + Math.max(AI_CONFIG.minIntervalMs, session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs);
     this.lastSentTick = observation.tick;
     this.sessionRequests++;
     this.publish({
@@ -192,19 +201,22 @@ export class JevController implements PlayerController {
         sessionToken: session.sessionToken, observation,
       }));
       if (this.disposed || generation !== this.generation) return;
+      const received = this.now();
+      const latency = received - started;
+      this.publish({ lastRoundTripMs: latency, lastLatencyMs: result.latencyMs });
       if (result.episodeId !== observation.episodeId || result.input.episodeId !== observation.episodeId ||
           result.basedOnTick !== observation.tick || result.input.basedOnTick !== observation.tick ||
           (this.input && result.basedOnTick <= this.input.basedOnTick) ||
           this.latestTick - result.basedOnTick > AI_CONFIG.maxTickAgeTicks ||
-          this.now() - started > AI_CONFIG.staleMs) {
+          latency > AI_CONFIG.maxResponseAgeMs) {
         throw new RequestFailure({ error: "invalid_request", message: "Decision is stale." });
       }
       this.input = result.input;
       this.inputObservedAt = started;
+      this.inputAcceptedAt = received;
       this.lastDecision = { ...result, observation };
       this.fallback = false;
-      const latency = this.now() - started;
-      this.nextRequestAt = started + Math.max(AI_CONFIG.minIntervalMs, result.input.holdForMs, latency * 1.2);
+      this.nextRequestAt = Math.max(this.nextRequestAt, started + Math.max(result.input.holdForMs, latency * 1.2));
       this.publish({
         mode: "live",
         lastLatencyMs: result.latencyMs,
@@ -238,7 +250,8 @@ export class JevController implements PlayerController {
       }
     }
     if (this.fallback) return this.mock.update(ctx);
-    if (this.input && now - this.inputObservedAt <= AI_CONFIG.staleMs &&
+    if (this.input && now - this.inputObservedAt <= AI_CONFIG.maxResponseAgeMs &&
+        now - this.inputAcceptedAt < Math.min(AI_CONFIG.staleMs, this.input.holdForMs) &&
         ctx.tick - this.input.basedOnTick <= AI_CONFIG.maxTickAgeTicks) return { ...this.input };
     return neutralInput(ctx.episodeId, ctx.tick);
   }

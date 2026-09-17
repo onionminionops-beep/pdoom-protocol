@@ -27,8 +27,8 @@ function harness(honorAbort = true) {
     world.tick = tick;
     return controller.update({ world, playerId: "p2", tick, episodeId: world.episodeId, nowMs: Date.now() });
   };
-  const replySession = (index = 0, requestBudget = 1200, expiresAt = Date.now() + 1800000) => {
-    requests[index].resolve(Response.json({ sessionToken: "test-session-token", requestBudget, expiresAt }));
+  const replySession = (index = 0, requestBudget = 1200, expiresAt = Date.now() + 1800000, minDecisionIntervalMs?: number) => {
+    requests[index].resolve(Response.json({ sessionToken: "test-session-token", requestBudget, expiresAt, minDecisionIntervalMs }));
   };
   const decision = (index = requests.length - 1): DecisionResponse => {
     const { observation } = DecisionRequestSchema.parse(JSON.parse(String(requests[index].init?.body)));
@@ -88,7 +88,7 @@ describe("JevController", () => {
     expect(h.controller.getLastDecision()?.observation.tick).toBe(11);
   });
 
-  it("holds previous inputs while waiting, then neutralizes them by observation age", async () => {
+  it("expires the previous hold while waiting for the next decision", async () => {
     const h = harness();
     h.replySession();
     await flush();
@@ -103,7 +103,7 @@ describe("JevController", () => {
     h.update(14);
     expect(h.requests).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(1);
-    expect(h.update(15).shoot).toBe(true);
+    expect(h.update(15)).toEqual(neutralInput("ep-test", 15));
     expect(h.requests).toHaveLength(3);
     await vi.advanceTimersByTimeAsync(151);
     expect(h.update(25)).toEqual(neutralInput("ep-test", 25));
@@ -122,7 +122,7 @@ describe("JevController", () => {
     if (kind === "input-episode") response.input.episodeId = "old-episode";
     if (kind === "input-tick") response.input.basedOnTick = 9;
     if (kind === "tick-age") h.update(10 + AI_CONFIG.maxTickAgeTicks + 1);
-    if (kind === "time-age") await vi.advanceTimersByTimeAsync(AI_CONFIG.staleMs + 1);
+    if (kind === "time-age") await vi.advanceTimersByTimeAsync(AI_CONFIG.maxResponseAgeMs + 1);
     h.replyDecision(response);
     await flush();
     expect(h.controller.getLastDecision()).toBeNull();
@@ -239,5 +239,147 @@ describe("JevController", () => {
     await vi.advanceTimersByTimeAsync(250);
     h.update();
     expect(h.requests).toHaveLength(2);
+  });
+
+  it("paces a ten-minute slice within the unchanged IP and session budgets", async () => {
+    const h = harness();
+    const start = Date.now();
+    const sent: number[] = [];
+    h.replySession(0, 1200, start + 1800000, 550);
+    await flush();
+    for (let elapsed = 100; elapsed < 600000 - 150; elapsed += 550) {
+      await vi.advanceTimersByTimeAsync(elapsed - (Date.now() - start));
+      h.update(Math.floor(elapsed * 0.06));
+      sent.push(Date.now());
+      expect(h.requests).toHaveLength(sent.length + 1);
+      await vi.advanceTimersByTimeAsync(150);
+      h.update(Math.floor((elapsed + 150) * 0.06));
+      expect(h.requests).toHaveLength(sent.length + 1);
+      h.replyDecision();
+      await flush();
+      expect(h.controller.getStatus()).toMatchObject({
+        mode: "live", minDecisionIntervalMs: 550, lastRoundTripMs: 150,
+      });
+      expect(h.update().horizontal).toBe("right");
+      await vi.advanceTimersByTimeAsync(251);
+      expect(h.update(Math.floor((elapsed + 401) * 0.06))).toEqual(neutralInput("ep-test", h.world.tick));
+      await vi.advanceTimersByTimeAsync(148);
+      h.update(Math.floor((elapsed + 549) * 0.06));
+      expect(h.requests).toHaveLength(sent.length + 1);
+    }
+    expect(sent.length).toBe(1091);
+    expect(sent.length).toBeLessThan(1200);
+    for (const time of sent) {
+      expect(sent.filter((t) => t > time - 60000 && t <= time).length).toBeLessThanOrEqual(110);
+    }
+    expect(h.controller.getStatus().consecutiveFailures).toBe(0);
+    expect(h.requests.filter((r) => r.url === "/api/jev/session")).toHaveLength(1);
+  });
+
+  it("keeps the advertised floor on failures, then resumes paced successes", async () => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 550);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    h.replyError();
+    await flush();
+    await vi.advanceTimersByTimeAsync(549);
+    h.update(38);
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    h.update(39);
+    expect(h.requests).toHaveLength(3);
+    h.replyDecision();
+    await flush();
+    await vi.advanceTimersByTimeAsync(549);
+    expect(h.update(71).horizontal).toBe("neutral");
+    expect(h.requests).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1);
+    h.update(72);
+    expect(h.requests).toHaveLength(4);
+    expect(h.controller.getStatus().mode).toBe("waiting");
+  });
+
+  it.each([100, 150, 200, 250] as const)("expires a received action after its %s ms hold without filling gaps with mock input", async (holdForMs) => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 550);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    await vi.advanceTimersByTimeAsync(450);
+    h.update(33);
+    const result = h.decision();
+    result.input.holdForMs = holdForMs;
+    h.replyDecision(result);
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "live", lastRoundTripMs: 450, lastLatencyMs: 20 });
+    expect(h.update().horizontal).toBe("right");
+    await vi.advanceTimersByTimeAsync(holdForMs - 1);
+    expect(h.update(33 + Math.floor((holdForMs - 1) * 0.06)).horizontal).toBe("right");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.update()).toEqual(neutralInput("ep-test", h.world.tick));
+    expect(h.requests).toHaveLength(3);
+    expect(h.controller.getStatus().mode).toBe("waiting");
+  });
+
+  it("adapts above the pacing floor for a slow response without overlapping requests", async () => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 550);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    await vi.advanceTimersByTimeAsync(599);
+    h.update(41);
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    h.replyDecision();
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ lastRoundTripMs: 600, lastLatencyMs: 20 });
+    await vi.advanceTimersByTimeAsync(119);
+    expect(h.update(49).horizontal).toBe("right");
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    h.update(49);
+    expect(h.requests).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(31);
+    expect(h.update(51)).toEqual(neutralInput("ep-test", 51));
+  });
+
+  it("does not renew a paced session to bypass its request cap", async () => {
+    const h = harness();
+    h.replySession(0, 2, Date.now() + 1800000, 550);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    h.replyDecision();
+    await flush();
+    await vi.advanceTimersByTimeAsync(550);
+    h.update(39);
+    h.replyDecision();
+    await flush();
+    await vi.advanceTimersByTimeAsync(550);
+    h.update(72);
+    expect(h.controller.getStatus()).toMatchObject({ mode: "fallback_mock", lastError: "session_budget_exhausted" });
+    await vi.advanceTimersByTimeAsync(60000);
+    h.update(3672);
+    expect(h.requests).toHaveLength(3);
+    expect(h.requests.filter((r) => r.url === "/api/jev/session")).toHaveLength(1);
+  });
+
+  it.each(["wall-clock", "tick"] as const)("never extends observation freshness after receipt (%s cap)", async (cap) => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 550);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    await vi.advanceTimersByTimeAsync(700);
+    h.update(48);
+    h.replyDecision();
+    await flush();
+    expect(h.update().shoot).toBe(true);
+    if (cap === "wall-clock") await vi.advanceTimersByTimeAsync(51);
+    expect(h.update(cap === "tick" ? 52 : 51)).toEqual(neutralInput("ep-test", h.world.tick));
+    expect(h.controller.getLastDecision()?.basedOnTick).toBe(6);
   });
 });

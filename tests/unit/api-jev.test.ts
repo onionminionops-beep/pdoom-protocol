@@ -66,6 +66,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("signed Jev sessions", () => {
+  it.each([
+    { budget: 1200, perMinute: 120, interval: 550 },
+    { budget: 12000, perMinute: 60, interval: 1100 },
+    { budget: 600, perMinute: 120, interval: 550 },
+  ])("advertises pacing for $budget requests and $perMinute/minute without changing signed budgets", async ({ budget, perMinute, interval }) => {
+    vi.stubEnv("JEV_SESSION_REQUEST_BUDGET", String(budget));
+    vi.stubEnv("JEV_IP_REQUESTS_PER_MINUTE", String(perMinute));
+    const result = await session();
+    expect(result.minDecisionIntervalMs).toBe(interval);
+    expect(result.requestBudget).toBe(budget);
+    const config = getJevConfig();
+    expect(verifySession(result.sessionToken, config.secret).budget).toBe(budget);
+    expect(config.ipPerMinute).toBe(perMinute);
+  });
+
   it("binds claims to the signature and expires after 30 minutes", () => {
     const config = getJevConfig();
     const { token, claims } = issueSession("ep-test", config, 100);

@@ -2,8 +2,9 @@
 export const AI_CONFIG = {
   minIntervalMs: 100,
   requestTimeoutMs: 1500,
-  /** Maximum wall-clock age of the observation behind an applied action. */
+  /** Maximum retention after receipt, also bounded by the requested hold. */
   staleMs: 400,
+  maxResponseAgeMs: 750,
   /** Decisions based on ticks older than this are discarded. */
   maxTickAgeTicks: 45,
   consecutiveFailuresBeforeMock: 4,
