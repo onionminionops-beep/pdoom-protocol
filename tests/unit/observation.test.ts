@@ -136,11 +136,12 @@ describe("bounded observation contract", () => {
       slots: { p1: "HUMAN", p2: "JEV" },
     });
     world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    world.players.p1.pos = { ...world.players.p2.pos };
     const obs = buildObservation(world, "p2", 0);
 
     expect(obs.rules).toMatchObject({
       units: "distance px; velocity px/s; time ms; tile 32 px",
-      coordinates: "+x right, +y down; relative positions use self center",
+      coordinates: "+x right, +y down; course left-to-right; relative positions use self center",
       dash: { speedPxPerS: 520, durationMs: 140, cooldownMs: 650 },
       weapon: {
         rangePx: 420,
@@ -149,6 +150,7 @@ describe("bounded observation contract", () => {
       },
     });
     expect(obs.rules.jump.maxRisePx).toBe(124);
+    expect(obs.rules.jump.approximateSameHeightReachPx).toBe(153);
     expect(obs.terrain.platforms.length).toBeLessThanOrEqual(2);
     expect(
       obs.terrain.platforms.every((platform) => platform.relativeRightX > platform.relativeLeftX),
@@ -165,6 +167,7 @@ describe("bounded observation contract", () => {
       slots: { p1: "HUMAN", p2: "JEV" },
     });
     world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    world.players.p1.pos = { ...world.players.p2.pos };
     const obs = buildObservation(world, "p2", 0);
 
     expect(obs.progression.roomId).toBe("r2_comments");
@@ -176,7 +179,7 @@ describe("bounded observation contract", () => {
       unlockCondition: "clear enemies",
       visibleRemainingEnemies: 4,
     });
-    expect(obs.terrain.nextObstruction).toMatchObject({ type: "closed_gate", side: "right" });
+    expect(obs.terrain.nextObstruction).toMatchObject({ type: "wall", side: "right" });
   });
 
   it("uses null gate context for an ungated bounded fixture", () => {
@@ -184,6 +187,20 @@ describe("bounded observation contract", () => {
     expect(obs.progression.gate).toBeNull();
     expect(obs.progression.blockedReason).toBeNull();
     expect(obs.terrain.nextObstruction).toBeNull();
+  });
+
+  it("scans walls to the visible camera edge, not a fixed short probe", () => {
+    const world = arena();
+    world.players.p2.pos = { x: 20 * 32, y: 15 * 32 - 20 };
+    world.level.rows[14] = `${world.level.rows[14].slice(0, 30)}#${world.level.rows[14].slice(31)}`;
+    const visible = buildObservation(world, "p2", 0);
+    expect(visible.terrain.rightWallDistance).toBeGreaterThan(160);
+    expect(visible.terrain.rightWallScan).toBeGreaterThan(visible.terrain.rightWallDistance!);
+
+    world.level.rows[14] = `${world.level.rows[14].slice(0, 30)}.${world.level.rows[14].slice(31)}`;
+    world.level.rows[14] = `${world.level.rows[14].slice(0, 40)}#${world.level.rows[14].slice(41)}`;
+    const offscreen = buildObservation(world, "p2", 0);
+    expect(offscreen.terrain.rightWallDistance).toBeNull();
   });
 
   it("reports exact bounded platform runs and edge-based gap estimates", () => {
@@ -209,6 +226,60 @@ describe("bounded observation contract", () => {
     });
     expect(platforms[1].horizontalGapPx).toBe(54);
     expect(platforms[1].relativeTopY).toBe(-12);
+  });
+
+  it("prefers reachable steps over an overlapping unreachable overhead surface", () => {
+    const world = arena();
+    world.level.rows = world.level.rows.map(() => ".".repeat(world.level.rows[0].length));
+    world.players.p2.pos = { x: 12 * 32, y: 15 * 32 - 20 };
+    world.level.rows[14] = `${world.level.rows[14].slice(0, 10)}--..--${world.level.rows[14].slice(16)}`;
+    world.level.rows[10] = `${world.level.rows[10].slice(0, 12)}--${world.level.rows[10].slice(14)}`;
+
+    const platforms = buildObservation(world, "p2", 0).terrain.platforms;
+
+    expect(platforms.map((platform) => platform.id)).toEqual(["platform-10-14", "platform-14-14"]);
+    expect(platforms.every((platform) => platform.reachableByJumpEstimate)).toBe(true);
+  });
+
+  it("chooses a nearer wall over a farther closed gate", () => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "wall-before-gate",
+      directive: "MONSTER_SLAYER",
+      slots: { p1: "HUMAN", p2: "JEV" },
+    });
+    world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    world.level.rows[14] = `${world.level.rows[14].slice(0, 54)}#${world.level.rows[14].slice(55)}`;
+
+    expect(buildObservation(world, "p2", 0).terrain.nextObstruction).toMatchObject({
+      type: "wall",
+      side: "right",
+    });
+  });
+
+  it("keeps a closed gate blocked when visible blockers are absent", () => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "hidden-gate-blocker",
+      directive: "MONSTER_SLAYER",
+      slots: { p1: "HUMAN", p2: "JEV" },
+    });
+    world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    for (const enemy of world.enemies) {
+      if (enemy.roomId === "r2_comments") enemy.health = 0;
+    }
+
+    const progression = buildObservation(world, "p2", 0).progression;
+
+    expect(progression.objectiveStatus).toBe("blocked");
+    expect(progression.gate).toMatchObject({
+      open: false,
+      visibleRemainingEnemies: 0,
+      unlockCondition: "clear enemies",
+    });
+    expect(progression.blockedReason).toContain("Gate closed");
   });
 
   it("does not expose hidden room totals and reports an opened switch gate", () => {

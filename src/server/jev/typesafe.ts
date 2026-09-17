@@ -20,12 +20,12 @@ import { JevApiError } from "./errors";
 
 const BASE_INSTRUCTIONS: Record<QuestionId, string> = {
   horizontal_input:
-    "Choose JEV's horizontal button for the next interval using platform edges/gaps and progression blockers. Trade speed, pickups, score, protection, and combat according to the directive.",
-  vertical_action: `Choose JEV's vertical button for the next interval. Jump is held, not one-shot; the rise/reach values in state are approximate. A full-height jump needs about ${Math.ceil((Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) * 1000)} ms of uninterrupted hold. If \`self.jumpHeld\` and rising, keep jump even when \`self.canJump\` is false; none releases and cuts ascent. Consider headroom, ledges, projectiles and platform edges.`,
+    "Choose horizontal input from edges, gaps, and blockers. Course is left-to-right; favor right on clear ground. Move left for combat, gates, safe detours, hazards, or recovery. Null wall means no solid wall in the visible scan, not a boundary; use wall scan fields.",
+  vertical_action: `Choose JEV's vertical button for the next interval. Jump is held, not one-shot; the rise/reach values in state are approximate. A full-height jump needs about ${Math.ceil((Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) * 1000)} ms of uninterrupted hold. If \`self.jumpHeld\` and rising, keep jump even when \`self.canJump\` is false; none releases and cuts ascent. Dash holds vertical velocity at zero; consider headroom, ledges, projectiles and platform edges.`,
   shoot_input:
     "Should JEV hold shoot for the next interval? Prefer a useful aligned shot at a visible threat or gate-clearing fight, while weighing ammo, range, danger, and the directive. There is no aim correction.",
   dash_input:
-    "Should JEV press dash for the next interval? Consider self.canDash, the next obstruction or gap, current facing, and immediate danger. Dash uses the rules in state and the same movement as the human.",
+    "Should JEV press dash for the next interval? Consider self.canDash, the next obstruction or safe gap/clear path, current facing, and immediate danger. Dash still collides with solid walls and gates; it does not pass through them.",
   interaction_input:
     "Should JEV hold interact for the next interval? Prefer an in-range required switch, gate-opening objective, weapon/ammo opportunity, or safe revive. The choice is independent of the other questions.",
   input_duration:
@@ -44,9 +44,11 @@ export function buildQuestions(obs: GameObservationV1) {
       .join("\n");
   return {
     horizontal_input: choice(instructions("horizontal_input"), {
-      left: "Move left toward the selected safe edge, platform, threat, or objective.",
-      neutral: "Do not accelerate horizontally; preserve alignment or avoid an unsafe edge.",
-      right: "Move right toward the selected safe edge, platform, threat, or objective.",
+      left: "Move left and face left toward the selected safe edge, platform, threat, or objective.",
+      neutral:
+        "Do not accelerate horizontally; preserve the current facing and alignment or avoid an unsafe edge.",
+      right:
+        "Move right and face right toward the selected safe edge, platform, threat, or objective.",
     }),
     vertical_action: choice(instructions("vertical_action"), {
       none: "Release the jump button; while rising this cuts jump height. Use after the apex, on flat ground, or for an intentional short hop.",
@@ -58,7 +60,7 @@ export function buildQuestions(obs: GameObservationV1) {
       false: "Release shoot when no aligned useful target is visible or conserving fire is better.",
     }),
     dash_input: choice(instructions("dash_input"), {
-      true: "Press dash to cross the immediate gap/obstruction or evade danger when canDash.",
+      true: "Press dash to traverse an immediate safe gap or clear path, or evade danger, when canDash; solids still collide.",
       false:
         "Do not spend dash; preserve the cooldown when no immediate crossing or evasion is needed.",
     }),
