@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClientAudio } from "@/game/client/audio";
 import { ClientSession, type ClientSnapshot, type SessionOptions } from "@/game/client/session";
 import { defaultSettings, keyLabel, type ClientSettings } from "@/game/client/settings";
-import { DIRECTIVES } from "@/game/contracts/directives";
+import { DIRECTIVES, type DirectiveId } from "@/game/contracts/directives";
 import { Hud } from "./Hud";
 import { Modal } from "./Modal";
 import { SettingsPanel } from "./SettingsPanel";
@@ -82,11 +82,16 @@ export default function GameShell() {
     audio.setSfxVolume(value.sfx);
   }
 
+  function updateDirective(directive: DirectiveId) {
+    sessionRef.current?.setDirective(directive);
+    setOptions((current) => ({ ...current, directive }));
+  }
+
   const ended = snapshot && snapshot.world.status !== "playing";
   return <div className={settings.colorblind ? "app-shell colorblind" : "app-shell"}>
     {!session || !snapshot ? <TitleScreen options={options} onOptions={setOptions} onStart={start} onSettings={() => setShowSettings(true)} /> :
       <main className="game-shell">
-        <Hud snapshot={snapshot} settings={settings} onPause={() => pause(true)} onQuit={quit} />
+        <Hud snapshot={snapshot} settings={settings} onPause={() => pause(true)} onQuit={quit} onDirectiveChange={updateDirective} />
         <section className="viewport-frame" aria-label="Game viewport"><PhaserCanvas session={session} /></section>
         <footer className="game-footer">
           <span>MOVE <kbd>{keyLabel(settings.bindings.left[0])}</kbd><kbd>{keyLabel(settings.bindings.right[0])}</kbd> &nbsp; JUMP <kbd>{keyLabel(settings.bindings.jump[0])}</kbd> &nbsp; FIRE <kbd>{keyLabel(settings.bindings.shoot[0])}</kbd> &nbsp; DASH <kbd>{keyLabel(settings.bindings.dash[0])}</kbd> &nbsp; INTERACT <kbd>{keyLabel(settings.bindings.interact[0])}</kbd></span>
