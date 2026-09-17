@@ -2,7 +2,7 @@
 export const AI_CONFIG = {
   minIntervalMs: 100,
   requestTimeoutMs: 1500,
-  /** Input decays to neutral after max(2*holdForMs, staleMs) without a fresh decision. */
+  /** Maximum wall-clock age of the observation behind an applied action. */
   staleMs: 400,
   /** Decisions based on ticks older than this are discarded. */
   maxTickAgeTicks: 45,
@@ -14,6 +14,7 @@ export const AI_CONFIG = {
     shoot: 0.5,
     dash: 0.55,
     interact: 0.5,
+    duration: 0.4,
   },
 } as const;
 
