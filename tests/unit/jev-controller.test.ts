@@ -4,6 +4,7 @@ import { JevController } from "@/game/controllers/jev";
 import { DecisionRequestSchema, type DecisionResponse } from "@/game/contracts/decision";
 import { PlayerInputV1Schema, neutralInput } from "@/game/contracts/input";
 import { CONSENSUS_HEIGHTS } from "@/game/levels/consensusHeights";
+import { stepWorld } from "@/game/sim/step";
 import { createWorld } from "@/game/sim/world";
 
 const controllers: JevController[] = [];
@@ -462,6 +463,45 @@ describe("JevController", () => {
       expect(h.controller.getStatus().mode).toBe("waiting");
     },
   );
+
+  it("continues a selected jump while the next delayed decision is in flight", async () => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 100);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    const first = h.decision();
+    first.input.verticalAction = "jump";
+    first.input.holdForMs = 100;
+    h.replyDecision(first);
+    await flush();
+
+    h.world.players.p2.grounded = true;
+    h.world.players.p2.jumpHeld = false;
+    let jumpTicks = 0;
+    let delayedRequestScheduled = false;
+    for (let tick = 7; tick < 27; tick++) {
+      const input = h.update(tick);
+      if (h.requests.length === 3 && !delayedRequestScheduled) {
+        delayedRequestScheduled = true;
+        const next = h.decision(2);
+        next.input.verticalAction = "jump";
+        next.input.holdForMs = 100;
+        setTimeout(() => h.replyDecision(next, 2), 300);
+      }
+      if (input.verticalAction === "jump") jumpTicks++;
+      stepWorld(h.world, {
+        p1: neutralInput(h.world.episodeId, h.world.tick),
+        p2: input,
+      });
+      await vi.advanceTimersByTimeAsync(17);
+    }
+
+    expect(delayedRequestScheduled).toBe(true);
+    expect(jumpTicks).toBe(20);
+    expect(h.world.players.p2.jumpHeld).toBe(true);
+    expect(h.world.players.p2.vel.y).toBeLessThan(0);
+  });
 
   it("adapts above the pacing floor for a slow response without overlapping requests", async () => {
     const h = harness();
