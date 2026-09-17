@@ -32,7 +32,8 @@ export class MockAIController implements PlayerController {
     const self = obs.self;
     const facingSign = self.facing === "right" ? 1 : -1;
     let horizontal: PlayerInputV1["horizontal"] = "right";
-    let verticalAction: PlayerInputV1["verticalAction"] = "none";
+    let verticalAction: PlayerInputV1["verticalAction"] =
+      self.jumpHeld && !self.grounded && self.velocity.y < 0 ? "jump" : "none";
     let shoot = false;
     let dash = false;
     let interact = false;

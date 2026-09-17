@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { APITimeoutError, choice, TypeSafeClient, type Questions } from "@typesafe-ai/sdk";
 import { z } from "zod";
 import { AI_CONFIG } from "@/game/config/ai";
+import { MOVEMENT } from "@/game/config/movement";
 import { DecisionResponseSchema, type DecisionResponse } from "@/game/contracts/decision";
 import { DIRECTIVES, type QuestionId } from "@/game/contracts/directives";
 import { HorizontalSchema, VerticalActionSchema, PlayerInputV1Schema } from "@/game/contracts/input";
@@ -11,7 +12,7 @@ import { JevApiError } from "./errors";
 
 const BASE_INSTRUCTIONS: Record<QuestionId, string> = {
   horizontal_input: "Choose JEV's horizontal button for the next interval: left, neutral, or right. Consider the objective, visible terrain and danger. Only a horizontal button changes facing; there is no automatic facing.",
-  vertical_action: "Choose JEV's vertical button for the next interval: none, jump, or drop through a one-way platform. Consider grounded state, headroom, ledges, projectiles and safe landing terrain.",
+  vertical_action: `Choose JEV's vertical button for the next interval. Jump is a held button, not a one-shot action. A full-height jump needs about ${Math.ceil(Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity * 1000)} ms of uninterrupted hold across successive decisions. When \`self.jumpHeld\` is true and \`self.velocity.y\` is negative, keep choosing jump to continue rising, even when \`self.canJump\` is false: canJump only permits starting a new jump. Choosing none releases jump immediately and cuts the ascent short. Release at the apex or before starting another jump; release earlier only for an intentional short hop, such as avoiding a ceiling. Consider headroom, ledges, projectiles and safe landing terrain.`,
   shoot_input: "Should JEV hold shoot for the next interval? Shots travel horizontally along self.facing with ordinary weapon cooldowns and range. Check visible enemies, alignment and line of fire. There is no aim correction.",
   dash_input: "Should JEV press dash for the next interval? Consider self.canDash, current facing and immediate danger. Dash uses the same cooldown and movement as the human.",
   interaction_input: "Should JEV hold interact for the next interval? Consider visible interactables in range and a downed teammate in revive range.",
@@ -27,7 +28,11 @@ export function buildQuestions(obs: GameObservationV1) {
   ].filter(Boolean).join("\n");
   return {
     horizontal_input: choice(instructions("horizontal_input"), { left: null, neutral: null, right: null }),
-    vertical_action: choice(instructions("vertical_action"), { none: null, jump: null, drop: null }),
+    vertical_action: choice(instructions("vertical_action"), {
+      none: "Release the jump button; while rising this cuts jump height. Use after the apex, on flat ground, or for an intentional short hop.",
+      jump: "Hold jump. Start a jump if canJump, or keep holding an existing jump while rising even when canJump is false.",
+      drop: "Drop through a one-way platform when grounded and the landing below is safe.",
+    }),
     shoot_input: choice(instructions("shoot_input"), { true: "Hold shoot.", false: "Release shoot." }),
     dash_input: choice(instructions("dash_input"), { true: "Press dash.", false: "Release dash." }),
     interaction_input: choice(instructions("interaction_input"), { true: "Hold interact.", false: "Release interact." }),
