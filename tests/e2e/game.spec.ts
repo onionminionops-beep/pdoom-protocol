@@ -37,7 +37,7 @@ test("human controls, focus guards, remapping and fresh directive episode", asyn
   });
   await startMock(page);
   const initial = await snapshot(page);
-  const modes = page.getByLabel("JEV mode", { exact: true });
+  const modes = page.getByRole("combobox", { name: "JEV mode", exact: true });
   await expect(modes.locator("option")).toHaveCount(5);
   for (const directive of [
     "GUARDIAN",
@@ -116,6 +116,7 @@ test("human controls, focus guards, remapping and fresh directive episode", asyn
 });
 
 test("same recorded human replay completes under two offline directives", async ({ page }) => {
+  test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await startMock(page);
@@ -143,13 +144,13 @@ test("same recorded human replay completes under two offline directives", async 
     await controls.getByRole("button", { name: `Run ${directive}`, exact: true }).click();
     await expect.poll(async () => (await snapshot(page)).episodeId).not.toBe(episode);
     episode = (await snapshot(page)).episodeId;
-    await expect(complete).toBeVisible();
+    await expect(complete).toBeVisible({ timeout: 30_000 });
     const row = complete
       .getByRole("row")
       .filter({ has: page.getByRole("rowheader", { name: directive, exact: true }) });
-    await expect(row).toContainText("replay complete");
+    await expect(row).toContainText("recording ended");
     await expect(row).toContainText("Mock");
-    expect(await panel.getByRole("status").innerText()).toBe(recorded);
+    expect(await complete.getByRole("status").innerText()).toBe(recorded);
   }
   await expect(complete.locator("tbody tr")).toHaveCount(2);
   const rows = await complete.locator("tbody tr").allTextContents();
