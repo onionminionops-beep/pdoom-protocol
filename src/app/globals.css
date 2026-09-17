@@ -42,6 +42,7 @@ h1 > span:not(.title-period) { color: var(--accent); }
 .title-backdrop { position: absolute; inset: 0; background-repeat: repeat-x; background-position: center bottom; image-rendering: pixelated; }
 .title-backdrop.bg_mid { background-position-x: 30%; }
 .title-backdrop.bg_near { background-position-x: 70%; }
+.title-backdrop-shade { position: absolute; inset: 0; background: rgb(0 0 0 / 35%); pointer-events: none; }
 .title-crest { position: absolute; width: 192px; height: 64px; top: 6px; right: 8px; object-fit: contain; image-rendering: pixelated; }
 .hero-pair { position: absolute; left: 12%; bottom: 26px; display: flex; gap: 12px; border-bottom: 4px solid #12aec0; background: linear-gradient(transparent 85%, #101529 85%); }
 .character-mark { width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; image-rendering: pixelated; }

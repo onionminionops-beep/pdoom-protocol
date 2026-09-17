@@ -32,6 +32,7 @@ export function TitleScreen({ options, onOptions, onStart, onSettings }: {
           <div className="title-art" aria-label="User and JEV standing above the Consensus Heights skyline" role="img">
             <div className="city-grid" />
             {Object.entries(manifest.backdrops).map(([key, layer]) => <div key={key} className={`title-backdrop ${key}`} style={{ backgroundImage: `url("/art/${layer.file}")`, backgroundSize: `${layer.width}px ${layer.height}px` }} />)}
+            <div className="title-backdrop-shade" />
             {!logoFailed && <Image className="title-crest" src={`/art/${manifest.ui.logo}`} width={384} height={128} alt="" unoptimized onError={() => setLogoFailed(true)} />}
             <div className="hero-pair"><CharacterMark fullBody /><CharacterMark jev fullBody /></div>
             <span className="art-caption">TWO PLAYERS / ONE SHARED REALITY</span>
