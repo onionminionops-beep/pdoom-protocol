@@ -73,6 +73,22 @@ describe("TypeSafe decisions", () => {
     },
   );
 
+  it("keeps world rules in state while each batched question stays focused", () => {
+    const obs = observation("SCORE_HUNTER");
+    const questions = buildQuestions(obs);
+    const serialized = serializeObservation(obs);
+
+    expect(serialized).toContain('"rules"');
+    expect(serialized).toContain('"progression"');
+    expect(serialized.length).toBeLessThan(18_000);
+    for (const question of Object.values(questions)) {
+      const instructions = question.instructions ?? "";
+      expect(instructions).toContain("authoritative rules");
+      expect(instructions.length).toBeLessThan(1_000);
+      expect(instructions).toContain("cannot read each other's answers");
+    }
+  });
+
   it("preserves raw answers and produces legal input tied to the observation", () => {
     const result = convertDecision(upstream(), observation(), 12, "req-example");
     expect(PlayerInputV1Schema.parse(result.input)).toEqual({

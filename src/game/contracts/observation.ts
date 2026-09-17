@@ -8,6 +8,70 @@ import { DirectiveIdSchema } from "./directives";
  */
 
 const Vec2 = z.object({ x: z.number(), y: z.number() });
+export const WeaponIdSchema = z.enum(["blaster", "shotgun", "launcher"]);
+export type WeaponId = z.infer<typeof WeaponIdSchema>;
+
+const RulesSchema = z.object({
+  units: z.object({
+    distance: z.literal("px"),
+    velocity: z.literal("px/s"),
+    time: z.literal("ms"),
+    tileSizePx: z.number().positive(),
+  }),
+  coordinates: z.object({
+    positiveX: z.literal("right"),
+    positiveY: z.literal("down"),
+    relativeTo: z.literal("self center"),
+  }),
+  movement: z.object({
+    bodyWidthPx: z.number().positive(),
+    bodyHeightPx: z.number().positive(),
+    runSpeedPxPerS: z.number().positive(),
+    maxFallSpeedPxPerS: z.number().positive(),
+  }),
+  jump: z.object({
+    jumpVelocityPxPerS: z.number(),
+    gravityPxPerS2: z.number().positive(),
+    maxRisePx: z.number().nonnegative(),
+    approximateFullHoldMs: z.number().positive(),
+    minimumHoldMs: z.number().positive(),
+    coyoteTimeMs: z.number().nonnegative(),
+    jumpCutVelocityPxPerS: z.number(),
+  }),
+  dash: z.object({
+    speedPxPerS: z.number().positive(),
+    durationMs: z.number().positive(),
+    cooldownMs: z.number().positive(),
+    verticalVelocity: z.literal("held at 0 while dashing"),
+  }),
+  weapon: z.object({
+    id: WeaponIdSchema,
+    label: z.string(),
+    damage: z.number().positive(),
+    pelletsPerShot: z.number().int().positive(),
+    rangePx: z.number().positive(),
+    fireCooldownMs: z.number().positive(),
+    ammunition: z.number().nullable(),
+    blastRadiusPx: z.number().nonnegative(),
+    firing: z.literal("horizontal along facing"),
+  }),
+  interaction: z.object({
+    interactRangePx: z.number().positive(),
+    reviveRangePx: z.number().positive(),
+    reviveHoldMs: z.number().positive(),
+    reviveHealthFraction: z.number().min(0).max(1),
+    reviveRequires: z.literal("alive, not downed, in range, and held interact"),
+  }),
+});
+
+const PlatformSchema = z.object({
+  id: z.string(),
+  relativePosition: Vec2,
+  widthPx: z.number().positive(),
+  surface: z.enum(["solid", "oneway"]),
+  hazardBelow: z.boolean(),
+  reachableByJumpEstimate: z.boolean(),
+});
 
 export const ObjectiveTypeSchema = z.enum([
   "traverse",
@@ -17,9 +81,6 @@ export const ObjectiveTypeSchema = z.enum([
   "interact",
   "reach_exit",
 ]);
-
-export const WeaponIdSchema = z.enum(["blaster", "shotgun", "launcher"]);
-export type WeaponId = z.infer<typeof WeaponIdSchema>;
 
 export const EnemyTypeSchema = z.enum([
   "doom_prophet",
@@ -71,6 +132,7 @@ export const GameObservationV1Schema = z.object({
   episodeId: z.string().min(1).max(64),
   tick: z.number().int().nonnegative(),
   timestampMs: z.number().nonnegative(),
+  rules: RulesSchema,
 
   directive: z.object({
     id: DirectiveIdSchema,
@@ -127,6 +189,30 @@ export const GameObservationV1Schema = z.object({
     safeLandingRight: z.boolean(),
     jumpWouldReachPlatform: z.boolean(),
     dropIsSafe: z.boolean(),
+    platforms: z.array(PlatformSchema).max(6),
+    nextObstruction: z
+      .object({
+        side: z.enum(["left", "right"]),
+        distancePx: z.number().nonnegative(),
+        type: z.enum(["wall", "closed_gate"]),
+      })
+      .nullable(),
+  }),
+  progression: z.object({
+    roomId: z.string(),
+    roomIndex: z.number().int().nonnegative(),
+    objectiveStatus: z.enum(["active", "blocked", "complete"]),
+    blockedReason: z.string().nullable(),
+    gate: z
+      .object({
+        present: z.boolean(),
+        open: z.boolean(),
+        distancePx: z.number().nullable(),
+        remainingEnemies: z.number().int().nonnegative(),
+        requiredSwitches: z.number().int().nonnegative(),
+        activatedSwitches: z.number().int().nonnegative(),
+      })
+      .nullable(),
   }),
 
   enemies: z

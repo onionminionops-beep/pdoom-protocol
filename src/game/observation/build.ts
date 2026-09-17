@@ -182,6 +182,53 @@ export function buildObservation(
     episodeId: world.episodeId,
     tick: world.tick,
     timestampMs,
+    rules: {
+      units: { distance: "px", velocity: "px/s", time: "ms", tileSizePx: TILE },
+      coordinates: { positiveX: "right", positiveY: "down", relativeTo: "self center" },
+      movement: {
+        bodyWidthPx: MOVEMENT.bodyWidth,
+        bodyHeightPx: MOVEMENT.bodyHeight,
+        runSpeedPxPerS: MOVEMENT.runSpeed,
+        maxFallSpeedPxPerS: MOVEMENT.maxFallSpeed,
+      },
+      jump: {
+        jumpVelocityPxPerS: MOVEMENT.jumpVelocity,
+        gravityPxPerS2: MOVEMENT.gravity,
+        maxRisePx: Math.round(
+          (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity),
+        ),
+        approximateFullHoldMs: Math.ceil(
+          (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) * 1000,
+        ),
+        minimumHoldMs: MOVEMENT.jumpMinHoldMs,
+        coyoteTimeMs: MOVEMENT.coyoteTimeMs,
+        jumpCutVelocityPxPerS: MOVEMENT.jumpCutVelocity,
+      },
+      dash: {
+        speedPxPerS: MOVEMENT.dashSpeed,
+        durationMs: MOVEMENT.dashDurationMs,
+        cooldownMs: MOVEMENT.dashCooldownMs,
+        verticalVelocity: "held at 0 while dashing",
+      },
+      weapon: {
+        id: self.weapon,
+        label: weapon.label,
+        damage: weapon.damage,
+        pelletsPerShot: weapon.pellets,
+        rangePx: weapon.rangePx,
+        fireCooldownMs: weapon.fireCooldownMs,
+        ammunition: self.ammo[self.weapon],
+        blastRadiusPx: weapon.blastRadius,
+        firing: "horizontal along facing",
+      },
+      interaction: {
+        interactRangePx: INTERACT_RANGE_PX,
+        reviveRangePx: REVIVE_RANGE_PX,
+        reviveHoldMs: MOVEMENT.reviveHoldMs,
+        reviveHealthFraction: MOVEMENT.reviveHealthFraction,
+        reviveRequires: "alive, not downed, in range, and held interact",
+      },
+    },
     directive: { id: directive.id, description: directive.description },
     objective: { type: room.objectiveType, description: room.objectiveText },
     self: {
@@ -232,7 +279,10 @@ export function buildObservation(
       safeLandingRight,
       jumpWouldReachPlatform,
       dropIsSafe,
+      platforms: describePlatforms(world, self),
+      nextObstruction: describeNextObstruction(world, self, leftWall, rightWall),
     },
+    progression: describeProgression(world, self, room),
     enemies,
     hostileProjectiles,
     pickups,
@@ -256,6 +306,161 @@ export function buildObservation(
     },
   };
   return GameObservationV1Schema.parse(obs);
+}
+
+function describePlatforms(
+  world: Readonly<WorldState>,
+  self: PlayerState,
+): Array<{
+  id: string;
+  relativePosition: { x: number; y: number };
+  widthPx: number;
+  surface: "solid" | "oneway";
+  hazardBelow: boolean;
+  reachableByJumpEstimate: boolean;
+}> {
+  const minTx = Math.max(0, Math.floor((self.pos.x - 480) / TILE));
+  const maxTx = Math.min(world.level.widthTiles - 1, Math.floor((self.pos.x + 480) / TILE));
+  const minTy = Math.max(1, Math.floor((self.pos.y - 270) / TILE));
+  const maxTy = Math.min(world.level.heightTiles - 1, Math.floor((self.pos.y + 270) / TILE));
+  const platforms: Array<{
+    id: string;
+    relativePosition: { x: number; y: number };
+    widthPx: number;
+    surface: "solid" | "oneway";
+    hazardBelow: boolean;
+    reachableByJumpEstimate: boolean;
+  }> = [];
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    let start = -1;
+    let surface: "solid" | "oneway" | null = null;
+    const flush = () => {
+      if (start < 0 || !surface) return;
+      const end = maxTx + 1;
+      addPlatform(start, end, ty, surface);
+      start = -1;
+      surface = null;
+    };
+    for (let tx = minTx; tx <= maxTx + 1; tx++) {
+      const kind = tx <= maxTx ? tileAt(world.level, tx, ty) : "empty";
+      const top = kind === "solid" || kind === "oneway";
+      const exposed = top && tileAt(world.level, tx, ty - 1) === "empty";
+      if (exposed && (surface === null || kind === surface)) {
+        if (start < 0) start = tx;
+        surface = kind;
+      } else {
+        flush();
+        if (exposed) {
+          start = tx;
+          surface = kind;
+        }
+      }
+    }
+  }
+  return platforms
+    .sort(
+      (a, b) =>
+        Math.abs(a.relativePosition.x) - Math.abs(b.relativePosition.x) ||
+        a.relativePosition.y - b.relativePosition.y ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, 6);
+
+  function addPlatform(start: number, end: number, ty: number, surface: "solid" | "oneway"): void {
+    const widthPx = (end - start) * TILE;
+    if (widthPx < MOVEMENT.bodyWidth) return;
+    const centerX = ((start + end) * TILE) / 2;
+    const topY = ty * TILE;
+    const maxRise = (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity);
+    platforms.push({
+      id: `platform-${start}-${ty}`,
+      relativePosition: { x: centerX - self.pos.x, y: topY - self.pos.y },
+      widthPx,
+      surface,
+      hazardBelow: Array.from({ length: end - start }, (_, i) =>
+        tileAt(world.level, start + i, ty + 1),
+      ).includes("hazard"),
+      reachableByJumpEstimate:
+        self.pos.y + MOVEMENT.bodyHeight / 2 - topY <= maxRise + TILE &&
+        Math.abs(centerX - self.pos.x) <= MOVEMENT.runSpeed * 0.75,
+    });
+  }
+}
+
+function describeNextObstruction(
+  world: Readonly<WorldState>,
+  self: PlayerState,
+  leftWall: number | null,
+  rightWall: number | null,
+): {
+  side: "left" | "right";
+  distancePx: number;
+  type: "wall" | "closed_gate";
+} | null {
+  const candidates = [
+    leftWall === null ? null : { side: "left" as const, distancePx: leftWall },
+    rightWall === null ? null : { side: "right" as const, distancePx: rightWall },
+  ].filter(
+    (candidate): candidate is { side: "left" | "right"; distancePx: number } => candidate !== null,
+  );
+  const room = roomAt(world.level, self.pos) ?? world.level.rooms[0];
+  const gateX = room?.gateTileX;
+  if (gateX !== null && gateX !== undefined && !world.openedGates[room.id]) {
+    const gateDistance = Math.abs((gateX + 0.5) * TILE - self.pos.x) - MOVEMENT.bodyWidth / 2;
+    if (gateDistance >= 0 && gateDistance <= 480) {
+      return {
+        side: gateX * TILE + TILE / 2 >= self.pos.x ? "right" : "left",
+        distancePx: Math.max(0, gateDistance),
+        type: "closed_gate",
+      };
+    }
+  }
+  if (candidates.length === 0) return null;
+  const nearest = candidates.sort((a, b) => a.distancePx - b.distancePx)[0];
+  return { ...nearest, type: "wall" };
+}
+
+function describeProgression(
+  world: Readonly<WorldState>,
+  self: PlayerState,
+  room: NonNullable<ReturnType<typeof roomAt>>,
+) {
+  const roomIndex = Math.max(
+    0,
+    world.level.rooms.findIndex((candidate) => candidate.id === room.id),
+  );
+  const remainingEnemies = world.enemies.filter(
+    (enemy) => enemy.roomId === room.id && enemy.health > 0 && enemy.phase !== "dying",
+  ).length;
+  const switches = world.interactables.filter(
+    (interactable) => interactable.type === "switch" && interactable.roomId === room.id,
+  );
+  const gate =
+    room.gateTileX === null
+      ? null
+      : {
+          present: true,
+          open: Boolean(world.openedGates[room.id]),
+          distancePx: Math.abs((room.gateTileX + 0.5) * TILE - self.pos.x),
+          remainingEnemies,
+          requiredSwitches: room.gateOnEnemies ? 0 : switches.length,
+          activatedSwitches: switches.filter((interactable) => interactable.activated).length,
+        };
+  const blockedReason =
+    room.gateOnEnemies && remainingEnemies > 0
+      ? `Clear ${remainingEnemies} room enem${remainingEnemies === 1 ? "y" : "ies"} to open the gate.`
+      : !room.gateOnEnemies &&
+          switches.length > 0 &&
+          switches.some((interactable) => !interactable.activated)
+        ? `Activate all ${switches.length} room switches before the gate opens.`
+        : null;
+  return {
+    roomId: room.id,
+    roomIndex,
+    objectiveStatus: blockedReason ? ("blocked" as const) : ("active" as const),
+    blockedReason,
+    gate,
+  };
 }
 
 function describeEnemy(

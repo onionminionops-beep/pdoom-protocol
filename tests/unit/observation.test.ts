@@ -7,6 +7,8 @@ import {
 import { buildObservation } from "@/game/observation/build";
 import { spawnEnemy } from "@/game/sim/enemies";
 import { fireEnemyProjectile } from "@/game/sim/enemyBehaviors";
+import { CONSENSUS_HEIGHTS } from "@/game/levels/consensusHeights";
+import { createWorld } from "@/game/sim/world";
 import { arena } from "./helpers/world";
 
 function expectSortedKeys(value: unknown) {
@@ -123,5 +125,64 @@ describe("bounded observation contract", () => {
     expect(parsed.timestampMs).toBe(12.35);
     expect(parsed.enemies.map((e) => e.id)).toEqual(obs.enemies.map((e) => e.id));
     expect(serializeObservation(parsed)).toBe(text);
+  });
+
+  it("exposes authoritative rules and bounded platform geometry without leaking the map", () => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "context",
+      directive: "MONSTER_SLAYER",
+      slots: { p1: "HUMAN", p2: "JEV" },
+    });
+    world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    const obs = buildObservation(world, "p2", 0);
+
+    expect(obs.rules).toMatchObject({
+      units: { distance: "px", velocity: "px/s", time: "ms", tileSizePx: 32 },
+      coordinates: { positiveX: "right", positiveY: "down", relativeTo: "self center" },
+      dash: { speedPxPerS: 520, durationMs: 140, cooldownMs: 650 },
+      weapon: {
+        id: "blaster",
+        rangePx: 420,
+        fireCooldownMs: 220,
+        firing: "horizontal along facing",
+      },
+    });
+    expect(obs.rules.jump.maxRisePx).toBe(124);
+    expect(obs.terrain.platforms.length).toBeLessThanOrEqual(6);
+    expect(obs.terrain.platforms.some((platform) => platform.surface === "oneway")).toBe(true);
+    expect(obs.terrain.platforms.every((platform) => platform.widthPx >= 20)).toBe(true);
+    expect(JSON.stringify(obs)).not.toContain('"rows"');
+  });
+
+  it("reports a closed combat gate and its actionable blocker", () => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "gate",
+      directive: "MONSTER_SLAYER",
+      slots: { p1: "HUMAN", p2: "JEV" },
+    });
+    world.players.p2.pos = { x: 52 * 32, y: 15 * 32 - 20 };
+    const obs = buildObservation(world, "p2", 0);
+
+    expect(obs.progression.roomId).toBe("r2_comments");
+    expect(obs.progression.objectiveStatus).toBe("blocked");
+    expect(obs.progression.blockedReason).toContain("Clear 4 room enemies");
+    expect(obs.progression.gate).toMatchObject({
+      present: true,
+      open: false,
+      remainingEnemies: 4,
+      requiredSwitches: 0,
+    });
+    expect(obs.terrain.nextObstruction).toMatchObject({ type: "closed_gate", side: "right" });
+  });
+
+  it("uses null gate context for an ungated bounded fixture", () => {
+    const obs = buildObservation(arena(), "p2", 0);
+    expect(obs.progression.gate).toBeNull();
+    expect(obs.progression.blockedReason).toBeNull();
+    expect(obs.terrain.nextObstruction).toBeNull();
   });
 });
