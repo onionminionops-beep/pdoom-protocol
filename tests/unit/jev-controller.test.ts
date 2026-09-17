@@ -503,6 +503,60 @@ describe("JevController", () => {
     expect(h.world.players.p2.vel.y).toBeLessThan(0);
   });
 
+  it("honors a fresh release after continuing a jump through a delayed response", async () => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 100);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    const first = h.decision();
+    first.input.verticalAction = "jump";
+    first.input.holdForMs = 100;
+    h.replyDecision(first);
+    await flush();
+    h.world.players.p2.grounded = true;
+    stepWorld(h.world, {
+      p1: neutralInput(h.world.episodeId, h.world.tick),
+      p2: h.update(7),
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.update(13).verticalAction).toBe("jump");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(h.update(25).verticalAction).toBe("jump");
+    const release = h.decision();
+    release.input.verticalAction = "none";
+    h.replyDecision(release);
+    await flush();
+    expect(h.update(26).verticalAction).toBe("none");
+  });
+
+  it.each([
+    { limit: "receipt age", latency: 0, elapsed: 400, tick: 30 },
+    { limit: "observation age", latency: 400, elapsed: 351, tick: 30 },
+    { limit: "tick age", latency: 0, elapsed: 200, tick: 52 },
+  ])("ends a pending jump at the $limit limit", async ({ latency, elapsed, tick }) => {
+    const h = harness();
+    h.replySession(0, 1200, Date.now() + 1800000, 100);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(6);
+    const first = h.decision();
+    first.input.verticalAction = "jump";
+    first.input.holdForMs = 100;
+    await vi.advanceTimersByTimeAsync(latency);
+    h.replyDecision(first);
+    await flush();
+    h.world.players.p2.grounded = true;
+    stepWorld(h.world, {
+      p1: neutralInput(h.world.episodeId, h.world.tick),
+      p2: h.update(7),
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.update(13).verticalAction).toBe("jump");
+    await vi.advanceTimersByTimeAsync(elapsed - 100);
+    expect(h.update(tick)).toEqual(neutralInput("ep-test", tick));
+  });
+
   it("adapts above the pacing floor for a slow response without overlapping requests", async () => {
     const h = harness();
     h.replySession(0, 1200, Date.now() + 1800000, 550);

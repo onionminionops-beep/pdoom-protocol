@@ -2,7 +2,7 @@
 export const AI_CONFIG = {
   minIntervalMs: 100,
   requestTimeoutMs: 1500,
-  /** Maximum retention after receipt, also bounded by the requested hold. */
+  /** Maximum retention after receipt, including in-flight jump continuation. */
   staleMs: 400,
   maxResponseAgeMs: 750,
   /** Decisions based on ticks older than this are discarded. */
