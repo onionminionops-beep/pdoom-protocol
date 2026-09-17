@@ -108,8 +108,8 @@ describe("signed Jev sessions", () => {
   });
 
   it("hashes the platform-verified IP rather than the spoofable forwarded header", () => {
-    vi.stubEnv("VERCEL", "1");
     const config = getJevConfig();
+    vi.stubEnv("VERCEL", "1");
     const first = clientIpKey(request({}, {
       "x-vercel-forwarded-for": "192.0.2.1", "x-forwarded-for": "198.51.100.1",
     }), config);
@@ -122,6 +122,41 @@ describe("signed Jev sessions", () => {
 });
 
 describe("decision route", () => {
+  it.each([
+    { name: "production", nodeEnv: "production", vercel: "", vercelEnv: "" },
+    { name: "Vercel with development NODE_ENV", nodeEnv: "development", vercel: "1", vercelEnv: "" },
+    { name: "Vercel preview", nodeEnv: "test", vercel: "", vercelEnv: "preview" },
+    { name: "Vercel production", nodeEnv: "development", vercel: "", vercelEnv: "production" },
+    { name: "unset NODE_ENV", nodeEnv: undefined, vercel: "", vercelEnv: "" },
+  ])("fails closed for both routes without Redis in $name", async ({ nodeEnv, vercel, vercelEnv }) => {
+    const { sessionToken } = await session();
+    mocks.getJevLimits.mockClear();
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("VERCEL", vercel);
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
+    await expectError(await sessionPost(request({ episodeId: "ep-test" })), 503, "misconfigured");
+    await expectError(await decisionPost(request({ sessionToken, observation: observation() })), 503, "misconfigured");
+    expect(mocks.getJevLimits).not.toHaveBeenCalled();
+    expect(mocks.requestDecision).not.toHaveBeenCalled();
+  });
+
+  it("accepts fully configured Upstash in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-only");
+    expect(getJevConfig()).toMatchObject({
+      redisUrl: "https://redis.example", redisToken: "test-only",
+    });
+  });
+
+  it.each(["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"])("rejects partial Redis configuration with only %s", async (name) => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv(name, "test-only");
+    await expectError(await sessionPost(request({ episodeId: "ep-test" })), 503, "misconfigured");
+    expect(mocks.requestDecision).not.toHaveBeenCalled();
+  });
+
   it.each([
     { tick: -1 }, { schemaVersion: "2.0" }, { self: { character: "user" } },
     { directive: { id: "EVIL", description: "" } }, { hostileProjectiles: Array(9).fill({}) },

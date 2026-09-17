@@ -88,6 +88,20 @@ describe("in-memory budgets", () => {
 });
 
 describe("Redis-backed budgets", () => {
+  it("rejects cached local limits when production requires Redis", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    expect(getJevLimits(config)).toBeInstanceOf(MemoryJevLimits);
+    vi.stubEnv("NODE_ENV", "production");
+    expect(() => getJevLimits(config)).toThrow(expect.objectContaining({ code: "misconfigured", status: 503 }));
+  });
+
+  it("replaces cached memory limits with Redis when storage is configured", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    expect(getJevLimits(config)).toBeInstanceOf(MemoryJevLimits);
+    vi.stubEnv("NODE_ENV", "production");
+    expect(getJevLimits({ ...config, redisUrl: "https://redis.example", redisToken: "test-only" })).toBeInstanceOf(RedisJevLimits);
+  });
+
   function backend() {
     const redis = new Redis({ url: "https://redis.example", token: "test-only", retry: false, enableAutoPipelining: false });
     const evalScript = vi.spyOn(redis, "eval").mockResolvedValue(1);

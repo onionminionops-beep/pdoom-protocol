@@ -14,7 +14,7 @@ do not prefix them with `NEXT_PUBLIC_`.
 | --- | --- |
 | `TYPESAFE_API_KEY` | Required for live inference. TypeSafe API key. |
 | `JEV_SESSION_SECRET` | Required for sessions, at least 32 bytes. Generate with `openssl rand -hex 32`. Keep consistent across instances; rotation invalidates existing tokens. |
-| `UPSTASH_REDIS_REST_URL` | Optional with its token. Configure both for shared production limits. |
+| `UPSTASH_REDIS_REST_URL` | Required in production and deployed runtimes, together with its token. Optional for local development and unit tests. |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash REST token with read/write/script access. |
 | `JEV_ALLOWED_ORIGINS` | Comma-separated exact browser origins, e.g. `https://game.example,http://localhost:3000`. Configure production and preview origins explicitly. |
 | `JEV_SESSION_REQUEST_BUDGET` | `1200` inference attempts per session. |
@@ -30,11 +30,17 @@ also match. No cross-origin CORS access is enabled. On Vercel, the IP identity u
 `x-forwarded-for`. Missing/invalid IPs share one budget bucket. Only an HMAC of the
 IP is stored.
 
-When both Upstash variables are absent, one process-local limiter is used, with one
-warning in development. Its counters disappear on restart and are **not shared
-across serverless instances**. Production deployments should configure Upstash.
-Partial Redis configuration fails closed, as do Redis errors and rate limiter
-timeouts; a Redis failure does not switch a configured deployment to memory.
+When both Upstash variables are absent, a process-local limiter is available only
+for local development and unit tests (`NODE_ENV=development` or `test`), with one
+warning in development. Its counters disappear on restart.
+Production, unset/unknown runtime modes and deployed Vercel runtimes require both
+Upstash variables. `VERCEL=1` or `VERCEL_ENV=production|preview` prohibits local
+fallback even with a development/test `NODE_ENV`. Both routes return a typed
+`misconfigured` 503 before issuing tokens or calling TypeSafe when storage is
+missing. Configuration and limiter selection both enforce this, including before
+returning a cached limiter. Partial Redis configuration also fails closed, as do
+Redis errors and rate limiter timeouts; storage failures never switch a configured
+deployment to memory.
 
 ## Request flow
 

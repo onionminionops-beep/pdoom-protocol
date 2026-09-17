@@ -12,6 +12,15 @@ function positiveInteger(name: string, fallback: number): number {
   return parsed;
 }
 
+export function validateJevStorage(redisUrl: string | undefined, redisToken: string | undefined): void {
+  const local = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  const deployed = process.env.VERCEL === "1" ||
+    process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
+  if (Boolean(redisUrl) !== Boolean(redisToken) || (!redisUrl && (!local || deployed))) {
+    throw new JevApiError("misconfigured", 503, "Jev storage is not configured.");
+  }
+}
+
 export function getJevConfig() {
   const secret = process.env.JEV_SESSION_SECRET;
   if (!secret || Buffer.byteLength(secret) < 32) {
@@ -19,9 +28,7 @@ export function getJevConfig() {
   }
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (Boolean(redisUrl) !== Boolean(redisToken)) {
-    throw new JevApiError("misconfigured", 503, "Jev storage is not configured.");
-  }
+  validateJevStorage(redisUrl, redisToken);
   return {
     secret,
     sessionTtlMs: 30 * 60 * 1000,

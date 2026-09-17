@@ -1,7 +1,7 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import type { JevConfig } from "./config";
+import { validateJevStorage, type JevConfig } from "./config";
 import { JevApiError } from "./errors";
 import type { SessionClaims } from "./session";
 
@@ -131,6 +131,8 @@ let limits: JevLimits | undefined;
 let warned = false;
 
 export function getJevLimits(config: JevConfig): JevLimits {
+  validateJevStorage(config.redisUrl, config.redisToken);
+  if (limits instanceof MemoryJevLimits && config.redisUrl) limits = undefined;
   if (limits) return limits;
   if (config.redisUrl && config.redisToken) {
     limits = new RedisJevLimits(config, new Redis({
