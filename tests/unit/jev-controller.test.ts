@@ -1,0 +1,243 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AI_CONFIG } from "@/game/config/ai";
+import { JevController } from "@/game/controllers/jev";
+import { DecisionRequestSchema, type DecisionResponse } from "@/game/contracts/decision";
+import { PlayerInputV1Schema, neutralInput } from "@/game/contracts/input";
+import { CONSENSUS_HEIGHTS } from "@/game/levels/consensusHeights";
+import { createWorld } from "@/game/sim/world";
+
+const controllers: JevController[] = [];
+
+function harness(honorAbort = true) {
+  const world = createWorld({
+    level: CONSENSUS_HEIGHTS, seed: 42, episodeId: "ep-test", directive: "SPEEDRUNNER",
+    slots: { p1: "HUMAN", p2: "JEV" },
+  });
+  const requests: Array<{
+    url: string; init?: RequestInit; resolve: (response: Response) => void;
+  }> = [];
+  const fetcher = vi.fn<typeof fetch>((url, init) => new Promise((resolve, reject) => {
+    requests.push({ url: String(url), init, resolve });
+    if (honorAbort) init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  }));
+  const onStatus = vi.fn();
+  const controller = new JevController({ fetch: fetcher, episodeId: world.episodeId, now: Date.now, onStatus });
+  controllers.push(controller);
+  const update = (tick = world.tick) => {
+    world.tick = tick;
+    return controller.update({ world, playerId: "p2", tick, episodeId: world.episodeId, nowMs: Date.now() });
+  };
+  const replySession = (index = 0, requestBudget = 1200, expiresAt = Date.now() + 1800000) => {
+    requests[index].resolve(Response.json({ sessionToken: "test-session-token", requestBudget, expiresAt }));
+  };
+  const decision = (index = requests.length - 1): DecisionResponse => {
+    const { observation } = DecisionRequestSchema.parse(JSON.parse(String(requests[index].init?.body)));
+    const answer = (choice: string) => ({ choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return {
+      requestId: `req-${index}`, episodeId: observation.episodeId, basedOnTick: observation.tick,
+      input: { ...neutralInput(observation.episodeId, observation.tick), horizontal: "right", shoot: true, holdForMs: 250 },
+      answers: {
+        horizontal_input: answer("right"), vertical_action: answer("none"),
+        shoot_input: answer("true"), dash_input: answer("false"), interaction_input: answer("false"),
+        input_duration: answer("250"),
+      },
+      gated: { horizontal: false, vertical: false, shoot: false, dash: false, interact: false },
+      latencyMs: 20, model: "jev-test",
+    };
+  };
+  const replyDecision = (data = decision(), index = requests.length - 1) => requests[index].resolve(Response.json(data));
+  const replyError = (code = "upstream_unavailable", retryAfterMs?: number) => {
+    requests[requests.length - 1].resolve(Response.json({
+      error: code, message: "Unavailable", retryAfterMs,
+    }, { status: 503 }));
+  };
+  return { world, controller, onStatus, requests, update, replySession, replyDecision, replyError, decision };
+}
+
+const flush = () => vi.advanceTimersByTimeAsync(0);
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(1000);
+});
+afterEach(() => {
+  for (const controller of controllers.splice(0)) controller.dispose();
+  vi.useRealTimers();
+});
+
+describe("JevController", () => {
+  it("connects on construction and never overlaps session or decision requests", async () => {
+    const h = harness();
+    expect(h.requests.map((r) => r.url)).toEqual(["/api/jev/session"]);
+    expect(h.controller.getStatus().mode).toBe("connecting");
+    for (let tick = 0; tick < 10; tick++) expect(h.update(tick)).toEqual(neutralInput("ep-test", tick));
+    expect(h.requests).toHaveLength(1);
+    h.replySession();
+    await flush();
+    h.update(10);
+    expect(h.requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(AI_CONFIG.minIntervalMs);
+    h.update(11);
+    expect(h.requests).toHaveLength(2);
+    for (let tick = 12; tick < 30; tick++) h.update(tick);
+    expect(h.requests).toHaveLength(2);
+    h.replyDecision();
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "live", requestsSent: 1, consecutiveFailures: 0 });
+    expect(h.onStatus).toHaveBeenLastCalledWith(h.controller.getStatus());
+    expect(h.controller.getLastDecision()?.observation.tick).toBe(11);
+  });
+
+  it("holds previous inputs while waiting, then neutralizes them by observation age", async () => {
+    const h = harness();
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    const snapshot = JSON.stringify(h.world);
+    h.update();
+    h.replyDecision();
+    await flush();
+    expect(h.update().horizontal).toBe("right");
+    expect(JSON.stringify(h.world)).toBe(snapshot);
+    await vi.advanceTimersByTimeAsync(249);
+    h.update(14);
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.update(15).shoot).toBe(true);
+    expect(h.requests).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(151);
+    expect(h.update(25)).toEqual(neutralInput("ep-test", 25));
+    expect(h.requests).toHaveLength(3);
+  });
+
+  it.each(["episode", "tick", "input-episode", "input-tick", "tick-age", "time-age"])("rejects a response with stale %s", async (kind) => {
+    const h = harness();
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update(10);
+    const response = h.decision();
+    if (kind === "episode") response.episodeId = "old-episode";
+    if (kind === "tick") response.basedOnTick = 9;
+    if (kind === "input-episode") response.input.episodeId = "old-episode";
+    if (kind === "input-tick") response.input.basedOnTick = 9;
+    if (kind === "tick-age") h.update(10 + AI_CONFIG.maxTickAgeTicks + 1);
+    if (kind === "time-age") await vi.advanceTimersByTimeAsync(AI_CONFIG.staleMs + 1);
+    h.replyDecision(response);
+    await flush();
+    expect(h.controller.getLastDecision()).toBeNull();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
+    expect(h.update().horizontal).toBe("neutral");
+  });
+
+  it("ignores an old episode response even if transport ignores cancellation", async () => {
+    const h = harness(false);
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update();
+    const old = h.decision();
+    h.world.episodeId = "new-episode";
+    expect(h.update(0)).toEqual(neutralInput("new-episode", 0));
+    expect(h.requests[1].init?.signal?.aborted).toBe(true);
+    expect(h.requests).toHaveLength(2);
+    h.replyDecision(old);
+    await flush();
+    expect(h.controller.getLastDecision()).toBeNull();
+    h.update();
+    expect(h.requests).toHaveLength(3);
+    expect(JSON.parse(String(h.requests[2].init?.body))).toEqual({ episodeId: "new-episode" });
+    h.replySession(2);
+    await flush();
+    expect(h.controller.getStatus().consecutiveFailures).toBe(0);
+  });
+
+  it("falls back after repeated failures, keeps mock inputs legal, and periodically recovers", async () => {
+    const h = harness();
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    for (let failure = 1; failure <= AI_CONFIG.consecutiveFailuresBeforeMock; failure++) {
+      h.update(failure);
+      h.replyError();
+      await flush();
+      if (failure < AI_CONFIG.consecutiveFailuresBeforeMock) await vi.advanceTimersByTimeAsync(100 * 2 ** failure);
+    }
+    expect(h.controller.getStatus().mode).toBe("fallback_mock");
+    const count = h.requests.length;
+    expect(PlayerInputV1Schema.safeParse(h.update(5)).success).toBe(true);
+    await vi.advanceTimersByTimeAsync(AI_CONFIG.retryLiveAfterMs - 1);
+    h.update(6);
+    expect(h.requests).toHaveLength(count);
+    await vi.advanceTimersByTimeAsync(1);
+    h.update(7);
+    expect(h.requests).toHaveLength(count + 1);
+    expect(h.controller.getStatus().mode).toBe("fallback_mock");
+    h.replyDecision();
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "live", consecutiveFailures: 0, lastError: null });
+    expect(h.update().horizontal).toBe("right");
+  });
+
+  it("respects Retry-After before retrying", async () => {
+    const h = harness();
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update();
+    h.replyError("rate_limited", 60000);
+    await flush();
+    await vi.advanceTimersByTimeAsync(59999);
+    h.update(1);
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    h.update(2);
+    expect(h.requests).toHaveLength(3);
+  });
+
+  it("waits for session expiry after exhausting its budget", async () => {
+    const h = harness();
+    h.replySession(0, 1, Date.now() + 1000);
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.update();
+    h.replyDecision();
+    await flush();
+    await vi.advanceTimersByTimeAsync(250);
+    h.update(1);
+    expect(h.controller.getStatus()).toMatchObject({ mode: "fallback_mock", lastError: "session_budget_exhausted" });
+    expect(h.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(650);
+    h.update(2);
+    expect(h.requests[2].url).toBe("/api/jev/session");
+  });
+
+  it("aborts timed out requests and ignores responses after disposal", async () => {
+    const h = harness();
+    await vi.advanceTimersByTimeAsync(AI_CONFIG.requestTimeoutMs + 501);
+    expect(h.requests[0].init?.signal?.aborted).toBe(true);
+    expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
+    h.controller.dispose();
+    h.replySession();
+    await flush();
+    expect(h.update()).toEqual(neutralInput("ep-test", 0));
+    expect(h.requests).toHaveLength(1);
+  });
+
+  it("does not send decisions while the world has ended or repeat a sent tick", async () => {
+    const h = harness();
+    h.replySession();
+    await flush();
+    await vi.advanceTimersByTimeAsync(100);
+    h.world.status = "won";
+    h.update();
+    expect(h.requests).toHaveLength(1);
+    h.world.status = "playing";
+    h.update();
+    h.replyDecision();
+    await flush();
+    await vi.advanceTimersByTimeAsync(250);
+    h.update();
+    expect(h.requests).toHaveLength(2);
+  });
+});
