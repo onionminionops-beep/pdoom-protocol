@@ -12,46 +12,29 @@ export const WeaponIdSchema = z.enum(["blaster", "shotgun", "launcher"]);
 export type WeaponId = z.infer<typeof WeaponIdSchema>;
 
 const RulesSchema = z.object({
-  units: z.object({
-    distance: z.literal("px"),
-    velocity: z.literal("px/s"),
-    time: z.literal("ms"),
-    tileSizePx: z.number().positive(),
-  }),
-  coordinates: z.object({
-    positiveX: z.literal("right"),
-    positiveY: z.literal("down"),
-    relativeTo: z.literal("self center"),
-  }),
+  units: z.literal("distance px; velocity px/s; time ms; tile 32 px"),
+  coordinates: z.literal("+x right, +y down; relative positions use self center"),
   movement: z.object({
     bodyWidthPx: z.number().positive(),
     bodyHeightPx: z.number().positive(),
     runSpeedPxPerS: z.number().positive(),
-    maxFallSpeedPxPerS: z.number().positive(),
   }),
   jump: z.object({
     jumpVelocityPxPerS: z.number(),
     gravityPxPerS2: z.number().positive(),
     maxRisePx: z.number().nonnegative(),
+    approximateHorizontalReachPx: z.number().positive(),
     approximateFullHoldMs: z.number().positive(),
     minimumHoldMs: z.number().positive(),
-    coyoteTimeMs: z.number().nonnegative(),
-    jumpCutVelocityPxPerS: z.number(),
   }),
   dash: z.object({
     speedPxPerS: z.number().positive(),
     durationMs: z.number().positive(),
     cooldownMs: z.number().positive(),
-    verticalVelocity: z.literal("held at 0 while dashing"),
   }),
   weapon: z.object({
-    id: WeaponIdSchema,
-    label: z.string(),
-    damage: z.number().positive(),
-    pelletsPerShot: z.number().int().positive(),
     rangePx: z.number().positive(),
     fireCooldownMs: z.number().positive(),
-    ammunition: z.number().nullable(),
     blastRadiusPx: z.number().nonnegative(),
     firing: z.literal("horizontal along facing"),
   }),
@@ -60,16 +43,16 @@ const RulesSchema = z.object({
     reviveRangePx: z.number().positive(),
     reviveHoldMs: z.number().positive(),
     reviveHealthFraction: z.number().min(0).max(1),
-    reviveRequires: z.literal("alive, not downed, in range, and held interact"),
   }),
 });
 
 const PlatformSchema = z.object({
   id: z.string(),
-  relativePosition: Vec2,
-  widthPx: z.number().positive(),
+  relativeLeftX: z.number(),
+  relativeRightX: z.number(),
+  relativeTopY: z.number(),
   surface: z.enum(["solid", "oneway"]),
-  hazardBelow: z.boolean(),
+  horizontalGapPx: z.number().nonnegative(),
   reachableByJumpEstimate: z.boolean(),
 });
 
@@ -189,7 +172,7 @@ export const GameObservationV1Schema = z.object({
     safeLandingRight: z.boolean(),
     jumpWouldReachPlatform: z.boolean(),
     dropIsSafe: z.boolean(),
-    platforms: z.array(PlatformSchema).max(6),
+    platforms: z.array(PlatformSchema).max(2),
     nextObstruction: z
       .object({
         side: z.enum(["left", "right"]),
@@ -201,16 +184,16 @@ export const GameObservationV1Schema = z.object({
   progression: z.object({
     roomId: z.string(),
     roomIndex: z.number().int().nonnegative(),
-    objectiveStatus: z.enum(["active", "blocked", "complete"]),
+    objectiveStatus: z.enum(["active", "blocked"]),
     blockedReason: z.string().nullable(),
     gate: z
       .object({
         present: z.boolean(),
         open: z.boolean(),
         distancePx: z.number().nullable(),
-        remainingEnemies: z.number().int().nonnegative(),
-        requiredSwitches: z.number().int().nonnegative(),
-        activatedSwitches: z.number().int().nonnegative(),
+        unlockCondition: z.enum(["clear enemies", "activate switches"]),
+        visibleRemainingEnemies: z.number().int().nonnegative(),
+        visibleUnactivatedSwitches: z.number().int().nonnegative(),
       })
       .nullable(),
   }),
@@ -308,12 +291,40 @@ export type ObservedProjectile = GameObservationV1["hostileProjectiles"][number]
 
 /** Stable key order + fixed float precision so identical states serialize identically. */
 export function serializeObservation(obs: GameObservationV1): string {
-  return JSON.stringify(obs, (_key, value: unknown) => {
-    if (typeof value === "number" && !Number.isInteger(value)) {
-      return Math.round(value * 100) / 100;
+  return serializeStable(obs);
+}
+
+export function serializeDecisionState(obs: GameObservationV1): string {
+  const { schemaVersion, episodeId, tick, timestampMs, enemies, pickups, ...state } = obs;
+  void schemaVersion;
+  void episodeId;
+  void tick;
+  void timestampMs;
+
+  return serializeStable({
+    ...state,
+    enemies: enemies.map((enemy) => {
+      const { distance, verticalAlignment, withinWeaponRange, ...compactEnemy } = enemy;
+      void distance;
+      void verticalAlignment;
+      void withinWeaponRange;
+      return compactEnemy;
+    }),
+    pickups: pickups.map((pickup) => {
+      const { distance, ...compactPickup } = pickup;
+      void distance;
+      return compactPickup;
+    }),
+  });
+}
+
+function serializeStable(value: unknown): string {
+  return JSON.stringify(value, (_key, nestedValue: unknown) => {
+    if (typeof nestedValue === "number" && !Number.isInteger(nestedValue)) {
+      return Math.round(nestedValue * 100) / 100;
     }
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const record = value as Record<string, unknown>;
+    if (nestedValue && typeof nestedValue === "object" && !Array.isArray(nestedValue)) {
+      const record = nestedValue as Record<string, unknown>;
       return Object.keys(record)
         .sort()
         .reduce<Record<string, unknown>>((acc, k) => {
@@ -321,6 +332,6 @@ export function serializeObservation(obs: GameObservationV1): string {
           return acc;
         }, {});
     }
-    return value;
+    return nestedValue;
   });
 }

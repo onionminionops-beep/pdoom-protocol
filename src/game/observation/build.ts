@@ -183,13 +183,12 @@ export function buildObservation(
     tick: world.tick,
     timestampMs,
     rules: {
-      units: { distance: "px", velocity: "px/s", time: "ms", tileSizePx: TILE },
-      coordinates: { positiveX: "right", positiveY: "down", relativeTo: "self center" },
+      units: "distance px; velocity px/s; time ms; tile 32 px",
+      coordinates: "+x right, +y down; relative positions use self center",
       movement: {
         bodyWidthPx: MOVEMENT.bodyWidth,
         bodyHeightPx: MOVEMENT.bodyHeight,
         runSpeedPxPerS: MOVEMENT.runSpeed,
-        maxFallSpeedPxPerS: MOVEMENT.maxFallSpeed,
       },
       jump: {
         jumpVelocityPxPerS: MOVEMENT.jumpVelocity,
@@ -197,27 +196,22 @@ export function buildObservation(
         maxRisePx: Math.round(
           (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity),
         ),
+        approximateHorizontalReachPx: Math.round(
+          MOVEMENT.runSpeed * (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity),
+        ),
         approximateFullHoldMs: Math.ceil(
           (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) * 1000,
         ),
         minimumHoldMs: MOVEMENT.jumpMinHoldMs,
-        coyoteTimeMs: MOVEMENT.coyoteTimeMs,
-        jumpCutVelocityPxPerS: MOVEMENT.jumpCutVelocity,
       },
       dash: {
         speedPxPerS: MOVEMENT.dashSpeed,
         durationMs: MOVEMENT.dashDurationMs,
         cooldownMs: MOVEMENT.dashCooldownMs,
-        verticalVelocity: "held at 0 while dashing",
       },
       weapon: {
-        id: self.weapon,
-        label: weapon.label,
-        damage: weapon.damage,
-        pelletsPerShot: weapon.pellets,
         rangePx: weapon.rangePx,
         fireCooldownMs: weapon.fireCooldownMs,
-        ammunition: self.ammo[self.weapon],
         blastRadiusPx: weapon.blastRadius,
         firing: "horizontal along facing",
       },
@@ -226,7 +220,6 @@ export function buildObservation(
         reviveRangePx: REVIVE_RANGE_PX,
         reviveHoldMs: MOVEMENT.reviveHoldMs,
         reviveHealthFraction: MOVEMENT.reviveHealthFraction,
-        reviveRequires: "alive, not downed, in range, and held interact",
       },
     },
     directive: { id: directive.id, description: directive.description },
@@ -313,10 +306,11 @@ function describePlatforms(
   self: PlayerState,
 ): Array<{
   id: string;
-  relativePosition: { x: number; y: number };
-  widthPx: number;
+  relativeLeftX: number;
+  relativeRightX: number;
+  relativeTopY: number;
   surface: "solid" | "oneway";
-  hazardBelow: boolean;
+  horizontalGapPx: number;
   reachableByJumpEstimate: boolean;
 }> {
   const minTx = Math.max(0, Math.floor((self.pos.x - 480) / TILE));
@@ -325,22 +319,16 @@ function describePlatforms(
   const maxTy = Math.min(world.level.heightTiles - 1, Math.floor((self.pos.y + 270) / TILE));
   const platforms: Array<{
     id: string;
-    relativePosition: { x: number; y: number };
-    widthPx: number;
+    relativeLeftX: number;
+    relativeRightX: number;
+    relativeTopY: number;
     surface: "solid" | "oneway";
-    hazardBelow: boolean;
+    horizontalGapPx: number;
     reachableByJumpEstimate: boolean;
   }> = [];
   for (let ty = minTy; ty <= maxTy; ty++) {
     let start = -1;
     let surface: "solid" | "oneway" | null = null;
-    const flush = () => {
-      if (start < 0 || !surface) return;
-      const end = maxTx + 1;
-      addPlatform(start, end, ty, surface);
-      start = -1;
-      surface = null;
-    };
     for (let tx = minTx; tx <= maxTx + 1; tx++) {
       const kind = tx <= maxTx ? tileAt(world.level, tx, ty) : "empty";
       const top = kind === "solid" || kind === "oneway";
@@ -349,7 +337,9 @@ function describePlatforms(
         if (start < 0) start = tx;
         surface = kind;
       } else {
-        flush();
+        if (start >= 0 && surface) addPlatform(start, tx, ty, surface);
+        start = -1;
+        surface = null;
         if (exposed) {
           start = tx;
           surface = kind;
@@ -360,29 +350,37 @@ function describePlatforms(
   return platforms
     .sort(
       (a, b) =>
-        Math.abs(a.relativePosition.x) - Math.abs(b.relativePosition.x) ||
-        a.relativePosition.y - b.relativePosition.y ||
+        a.horizontalGapPx - b.horizontalGapPx ||
+        Math.abs(a.relativeLeftX + a.relativeRightX) -
+          Math.abs(b.relativeLeftX + b.relativeRightX) ||
+        a.relativeTopY - b.relativeTopY ||
         a.id.localeCompare(b.id),
     )
-    .slice(0, 6);
+    .slice(0, 2);
 
   function addPlatform(start: number, end: number, ty: number, surface: "solid" | "oneway"): void {
     const widthPx = (end - start) * TILE;
     if (widthPx < MOVEMENT.bodyWidth) return;
-    const centerX = ((start + end) * TILE) / 2;
+    const leftX = start * TILE;
+    const rightX = end * TILE;
     const topY = ty * TILE;
     const maxRise = (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity);
+    const bodyLeft = self.pos.x - MOVEMENT.bodyWidth / 2;
+    const bodyRight = self.pos.x + MOVEMENT.bodyWidth / 2;
+    const horizontalGapPx = Math.max(0, Math.max(bodyLeft - rightX, leftX - bodyRight));
+    const nearestEdgeDistance = Math.min(Math.abs(leftX - bodyRight), Math.abs(rightX - bodyLeft));
     platforms.push({
       id: `platform-${start}-${ty}`,
-      relativePosition: { x: centerX - self.pos.x, y: topY - self.pos.y },
-      widthPx,
+      relativeLeftX: leftX - self.pos.x,
+      relativeRightX: rightX - self.pos.x,
+      relativeTopY: topY - self.pos.y,
       surface,
-      hazardBelow: Array.from({ length: end - start }, (_, i) =>
-        tileAt(world.level, start + i, ty + 1),
-      ).includes("hazard"),
       reachableByJumpEstimate:
         self.pos.y + MOVEMENT.bodyHeight / 2 - topY <= maxRise + TILE &&
-        Math.abs(centerX - self.pos.x) <= MOVEMENT.runSpeed * 0.75,
+        (horizontalGapPx <=
+          MOVEMENT.runSpeed * (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) ||
+          nearestEdgeDistance <= MOVEMENT.bodyWidth),
+      horizontalGapPx,
     });
   }
 }
@@ -429,12 +427,20 @@ function describeProgression(
     0,
     world.level.rooms.findIndex((candidate) => candidate.id === room.id),
   );
-  const remainingEnemies = world.enemies.filter(
-    (enemy) => enemy.roomId === room.id && enemy.health > 0 && enemy.phase !== "dying",
+  const visibleRemainingEnemies = world.enemies.filter(
+    (enemy) =>
+      enemy.roomId === room.id &&
+      enemy.health > 0 &&
+      enemy.phase !== "dying" &&
+      visibleFrom(world.level, self.pos, enemy.pos),
   ).length;
-  const switches = world.interactables.filter(
-    (interactable) => interactable.type === "switch" && interactable.roomId === room.id,
-  );
+  const visibleUnactivatedSwitches = world.interactables.filter(
+    (interactable) =>
+      interactable.type === "switch" &&
+      interactable.roomId === room.id &&
+      !interactable.activated &&
+      visibleFrom(world.level, self.pos, interactable.pos),
+  ).length;
   const gate =
     room.gateTileX === null
       ? null
@@ -442,17 +448,21 @@ function describeProgression(
           present: true,
           open: Boolean(world.openedGates[room.id]),
           distancePx: Math.abs((room.gateTileX + 0.5) * TILE - self.pos.x),
-          remainingEnemies,
-          requiredSwitches: room.gateOnEnemies ? 0 : switches.length,
-          activatedSwitches: switches.filter((interactable) => interactable.activated).length,
+          unlockCondition: room.gateOnEnemies
+            ? ("clear enemies" as const)
+            : ("activate switches" as const),
+          visibleRemainingEnemies,
+          visibleUnactivatedSwitches,
         };
   const blockedReason =
-    room.gateOnEnemies && remainingEnemies > 0
-      ? `Clear ${remainingEnemies} room enem${remainingEnemies === 1 ? "y" : "ies"} to open the gate.`
-      : !room.gateOnEnemies &&
-          switches.length > 0 &&
-          switches.some((interactable) => !interactable.activated)
-        ? `Activate all ${switches.length} room switches before the gate opens.`
+    !world.openedGates[room.id] && room.gateOnEnemies && visibleRemainingEnemies > 0
+      ? `Clear ${visibleRemainingEnemies} visible room enem${
+          visibleRemainingEnemies === 1 ? "y" : "ies"
+        }; hidden room state is unknown.`
+      : !world.openedGates[room.id] && !room.gateOnEnemies && visibleUnactivatedSwitches > 0
+        ? `Activate the ${visibleUnactivatedSwitches} visible unactivated switch${
+            visibleUnactivatedSwitches === 1 ? "" : "es"
+          }; other switch state is unknown.`
         : null;
   return {
     roomId: room.id,

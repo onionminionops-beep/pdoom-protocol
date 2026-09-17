@@ -139,20 +139,20 @@ describe("bounded observation contract", () => {
     const obs = buildObservation(world, "p2", 0);
 
     expect(obs.rules).toMatchObject({
-      units: { distance: "px", velocity: "px/s", time: "ms", tileSizePx: 32 },
-      coordinates: { positiveX: "right", positiveY: "down", relativeTo: "self center" },
+      units: "distance px; velocity px/s; time ms; tile 32 px",
+      coordinates: "+x right, +y down; relative positions use self center",
       dash: { speedPxPerS: 520, durationMs: 140, cooldownMs: 650 },
       weapon: {
-        id: "blaster",
         rangePx: 420,
         fireCooldownMs: 220,
         firing: "horizontal along facing",
       },
     });
     expect(obs.rules.jump.maxRisePx).toBe(124);
-    expect(obs.terrain.platforms.length).toBeLessThanOrEqual(6);
-    expect(obs.terrain.platforms.some((platform) => platform.surface === "oneway")).toBe(true);
-    expect(obs.terrain.platforms.every((platform) => platform.widthPx >= 20)).toBe(true);
+    expect(obs.terrain.platforms.length).toBeLessThanOrEqual(2);
+    expect(
+      obs.terrain.platforms.every((platform) => platform.relativeRightX > platform.relativeLeftX),
+    ).toBe(true);
     expect(JSON.stringify(obs)).not.toContain('"rows"');
   });
 
@@ -169,12 +169,12 @@ describe("bounded observation contract", () => {
 
     expect(obs.progression.roomId).toBe("r2_comments");
     expect(obs.progression.objectiveStatus).toBe("blocked");
-    expect(obs.progression.blockedReason).toContain("Clear 4 room enemies");
+    expect(obs.progression.blockedReason).toContain("Clear 4 visible room enemies");
     expect(obs.progression.gate).toMatchObject({
       present: true,
       open: false,
-      remainingEnemies: 4,
-      requiredSwitches: 0,
+      unlockCondition: "clear enemies",
+      visibleRemainingEnemies: 4,
     });
     expect(obs.terrain.nextObstruction).toMatchObject({ type: "closed_gate", side: "right" });
   });
@@ -184,5 +184,54 @@ describe("bounded observation contract", () => {
     expect(obs.progression.gate).toBeNull();
     expect(obs.progression.blockedReason).toBeNull();
     expect(obs.terrain.nextObstruction).toBeNull();
+  });
+
+  it("reports exact bounded platform runs and edge-based gap estimates", () => {
+    const world = arena();
+    world.level.rows = world.level.rows.map(() => ".".repeat(world.level.rows[0].length));
+    world.players.p2.pos = { x: 12 * 32, y: 15 * 32 - 20 };
+    world.level.rows[14] =
+      world.level.rows[14].slice(0, 10) +
+      "--" +
+      world.level.rows[14].slice(12, 14) +
+      "--" +
+      world.level.rows[14].slice(16);
+    world.level.rows[13] = ".".repeat(world.level.rows[13].length);
+    world.level.rows[16] = ".".repeat(world.level.rows[16].length);
+    const obs = buildObservation(world, "p2", 0);
+    const platforms = obs.terrain.platforms.filter((platform) => platform.id.endsWith("-14"));
+
+    expect(platforms.map((platform) => platform.id)).toEqual(["platform-10-14", "platform-14-14"]);
+    expect(platforms[0]).toMatchObject({
+      relativeLeftX: -64,
+      relativeRightX: 0,
+      horizontalGapPx: 0,
+    });
+    expect(platforms[1].horizontalGapPx).toBe(54);
+    expect(platforms[1].relativeTopY).toBe(-12);
+  });
+
+  it("does not expose hidden room totals and reports an opened switch gate", () => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "switch-gate",
+      directive: "SCORE_HUNTER",
+      slots: { p1: "HUMAN", p2: "JEV" },
+    });
+    world.players.p2.pos = { x: 180 * 32, y: 15 * 32 - 20 };
+    const closed = buildObservation(world, "p2", 0);
+    expect(closed.progression.gate).toMatchObject({
+      open: false,
+      unlockCondition: "activate switches",
+      visibleUnactivatedSwitches: 2,
+    });
+    expect(closed.progression.blockedReason).toContain("visible unactivated switches");
+
+    world.openedGates.r6_split = true;
+    const open = buildObservation(world, "p2", 0);
+    expect(open.progression.gate).toMatchObject({ open: true });
+    expect(open.progression.objectiveStatus).toBe("active");
+    expect(open.progression.blockedReason).toBeNull();
   });
 });

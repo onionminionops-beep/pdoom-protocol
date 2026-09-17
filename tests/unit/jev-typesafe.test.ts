@@ -4,7 +4,7 @@ import { AI_CONFIG } from "@/game/config/ai";
 import { MOVEMENT, TICK_MS } from "@/game/config/movement";
 import { DIRECTIVES, type DirectiveId } from "@/game/contracts/directives";
 import { PlayerInputV1Schema, neutralInput } from "@/game/contracts/input";
-import { serializeObservation } from "@/game/contracts/observation";
+import { serializeDecisionState } from "@/game/contracts/observation";
 import { CONSENSUS_HEIGHTS } from "@/game/levels/consensusHeights";
 import { buildObservation } from "@/game/observation/build";
 import { createWorld } from "@/game/sim/world";
@@ -76,17 +76,17 @@ describe("TypeSafe decisions", () => {
   it("keeps world rules in state while each batched question stays focused", () => {
     const obs = observation("SCORE_HUNTER");
     const questions = buildQuestions(obs);
-    const serialized = serializeObservation(obs);
+    const serialized = serializeDecisionState(obs);
 
     expect(serialized).toContain('"rules"');
     expect(serialized).toContain('"progression"');
-    expect(serialized.length).toBeLessThan(18_000);
+    expect(serialized.length).toBeLessThan(3_000);
     for (const question of Object.values(questions)) {
       const instructions = question.instructions ?? "";
-      expect(instructions).toContain("authoritative rules");
-      expect(instructions.length).toBeLessThan(1_000);
-      expect(instructions).toContain("cannot read each other's answers");
+      expect(instructions.length).toBeLessThan(700);
     }
+    expect(questions.horizontal_input.criteria.left).toContain("safe edge");
+    expect(questions.dash_input.criteria.true).toContain("gap");
   });
 
   it("preserves raw answers and produces legal input tied to the observation", () => {
@@ -216,7 +216,7 @@ describe("TypeSafe decisions", () => {
     expect(String(url)).toBe("https://api.typesafe.ai/v1/systemone");
     expect(JSON.parse(String(init?.body))).toEqual({
       model: "jev-latest",
-      state: serializeObservation(observation()),
+      state: serializeDecisionState(observation()),
       questions: buildQuestions(observation()),
     });
     expect(result.requestId).toBe("upstream-id");
