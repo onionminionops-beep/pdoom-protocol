@@ -1,10 +1,5 @@
 import type { HoldForMs, PlayerInputV1 } from "../contracts/input";
-import type {
-  EnemyType,
-  InteractableType,
-  PickupType,
-  WeaponId,
-} from "../contracts/observation";
+import type { EnemyType, InteractableType, PickupType, WeaponId } from "../contracts/observation";
 import type { DirectiveId } from "../contracts/directives";
 
 export type Facing = "left" | "right";
@@ -78,7 +73,8 @@ export interface PlayerState {
   damageTaken: number;
 }
 
-export type EnemyPhase = "idle" | "move" | "telegraph" | "attack" | "recover" | "hurt" | "dying" | "special";
+export type EnemyPhase =
+  "idle" | "move" | "telegraph" | "attack" | "recover" | "hurt" | "dying" | "special";
 
 export interface EnemyState {
   id: string;
@@ -148,7 +144,8 @@ export interface RoomDef {
   id: string;
   /** Tile-space bounds [x0, y0, x1, y1) */
   bounds: [number, number, number, number];
-  objectiveType: "traverse" | "survive" | "defeat_enemies" | "revive_teammate" | "interact" | "reach_exit";
+  objectiveType:
+    "traverse" | "survive" | "defeat_enemies" | "revive_teammate" | "interact" | "reach_exit";
   objectiveText: string;
   /** Gate closes until enemies in this room are cleared. */
   gateOnEnemies: boolean;
@@ -175,8 +172,22 @@ export interface LevelData {
   spawns: { p1: [number, number]; p2: [number, number] };
   rooms: RoomDef[];
   enemies: EnemySpawnDef[];
-  pickups: Array<{ id: string; type: PickupType; tileX: number; tileY: number; value?: number; roomId: string }>;
-  interactables: Array<Omit<InteractableState, "pos" | "activated" | "w" | "h"> & { tileX: number; tileY: number; wTiles?: number; hTiles?: number }>;
+  pickups: Array<{
+    id: string;
+    type: PickupType;
+    tileX: number;
+    tileY: number;
+    value?: number;
+    roomId: string;
+  }>;
+  interactables: Array<
+    Omit<InteractableState, "pos" | "activated" | "w" | "h"> & {
+      tileX: number;
+      tileY: number;
+      wTiles?: number;
+      hTiles?: number;
+    }
+  >;
   exitTileX: number;
 }
 
@@ -190,7 +201,11 @@ export interface ScoreBreakdown {
 
 export type SimEvent =
   | { type: "shot"; playerId: PlayerId; weapon: WeaponId; facing: Facing; pos: Vec2 }
-  | { type: "shot_blocked"; playerId: PlayerId; reason: "cooldown" | "no_ammo" | "downed" | "dashing" }
+  | {
+      type: "shot_blocked";
+      playerId: PlayerId;
+      reason: "cooldown" | "no_ammo" | "downed" | "dashing";
+    }
   | { type: "projectile_hit"; projectileId: string; targetId: string; pos: Vec2; damage: number }
   | { type: "projectile_expired"; projectileId: string; pos: Vec2 }
   | { type: "explosion"; pos: Vec2; radius: number }
@@ -205,7 +220,12 @@ export type SimEvent =
   | { type: "land"; playerId: PlayerId; impactVy: number }
   | { type: "dash"; playerId: PlayerId; facing: Facing }
   | { type: "pickup"; playerId: PlayerId; pickupId: string; pickupType: PickupType; value: number }
-  | { type: "interact"; playerId: PlayerId; interactableId: string; interactableType: InteractableType }
+  | {
+      type: "interact";
+      playerId: PlayerId;
+      interactableId: string;
+      interactableType: InteractableType;
+    }
   | { type: "fact_check_pulse"; playerId: PlayerId; pos: Vec2 }
   | { type: "enemy_bubble"; enemyId: string; text: string }
   | { type: "enemy_telegraph"; enemyId: string }
@@ -239,7 +259,14 @@ export interface WorldState {
   nextId: number;
   rngState: number;
   /** Camera-independent "restricted" zones from Hall Monitors: tile-space AABBs with ms remaining. */
-  restrictedZones: Array<{ x: number; y: number; w: number; h: number; msLeft: number; ownerId: string }>;
+  restrictedZones: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    msLeft: number;
+    ownerId: string;
+  }>;
   bossActive: boolean;
   bossPhase: number;
   winTimerMs: number;

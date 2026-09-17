@@ -120,11 +120,24 @@ export function moveAABB(
     }
   }
 
-  return { pos: { x, y }, vel: { x: vx, y: vy }, hitGround, hitCeiling, hitWall, onOneWay, onHazard };
+  return {
+    pos: { x, y },
+    vel: { x: vx, y: vy },
+    hitGround,
+    hitCeiling,
+    hitWall,
+    onOneWay,
+    onHazard,
+  };
 }
 
 /** Is there standing surface directly under this box (within `probe` px)? */
-export function groundBelow(level: LevelData, box: AABB, probe: number, ignoreOneWay: boolean): { found: boolean; oneWay: boolean } {
+export function groundBelow(
+  level: LevelData,
+  box: AABB,
+  probe: number,
+  ignoreOneWay: boolean,
+): { found: boolean; oneWay: boolean } {
   const hh = box.h / 2;
   const hw = box.w / 2;
   const bottom = box.y + hh;
@@ -145,7 +158,12 @@ export function groundBelow(level: LevelData, box: AABB, probe: number, ignoreOn
 }
 
 /** Distance (px) to the first solid/oneway tile below point, or null within maxPx. */
-export function distanceToGround(level: LevelData, x: number, yBottom: number, maxPx: number): number | null {
+export function distanceToGround(
+  level: LevelData,
+  x: number,
+  yBottom: number,
+  maxPx: number,
+): number | null {
   const tx = Math.floor(x / TILE);
   const ty0 = Math.floor(yBottom / TILE);
   for (let ty = ty0; ty * TILE <= yBottom + maxPx; ty++) {
@@ -157,7 +175,12 @@ export function distanceToGround(level: LevelData, x: number, yBottom: number, m
   return null;
 }
 
-export function distanceToCeiling(level: LevelData, x: number, yTop: number, maxPx: number): number | null {
+export function distanceToCeiling(
+  level: LevelData,
+  x: number,
+  yTop: number,
+  maxPx: number,
+): number | null {
   const tx = Math.floor(x / TILE);
   const ty0 = Math.floor(yTop / TILE);
   for (let ty = ty0; (ty + 1) * TILE >= yTop - maxPx && ty >= -1; ty--) {
@@ -166,7 +189,13 @@ export function distanceToCeiling(level: LevelData, x: number, yTop: number, max
   return null;
 }
 
-export function distanceToWall(level: LevelData, xEdge: number, y: number, dir: 1 | -1, maxPx: number): number | null {
+export function distanceToWall(
+  level: LevelData,
+  xEdge: number,
+  y: number,
+  dir: 1 | -1,
+  maxPx: number,
+): number | null {
   const ty = Math.floor(y / TILE);
   let tx = Math.floor(xEdge / TILE);
   for (let i = 0; i <= Math.ceil(maxPx / TILE) + 1; i++) {
@@ -192,9 +221,7 @@ export function horizontalLineClear(level: LevelData, x0: number, x1: number, y:
 }
 
 export function aabbOverlap(a: AABB, b: AABB): boolean {
-  return (
-    Math.abs(a.x - b.x) * 2 < a.w + b.w && Math.abs(a.y - b.y) * 2 < a.h + b.h
-  );
+  return Math.abs(a.x - b.x) * 2 < a.w + b.w && Math.abs(a.y - b.y) * 2 < a.h + b.h;
 }
 
 export function circleAABBOverlap(cx: number, cy: number, r: number, b: AABB): boolean {

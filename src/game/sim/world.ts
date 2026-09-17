@@ -1,7 +1,6 @@
 import { MOVEMENT, TILE } from "../config/movement";
 import type { DirectiveId } from "../contracts/directives";
 import { WEAPONS } from "../config/weapons";
-import { hashString } from "./rng";
 import { spawnEnemy } from "./enemies";
 import type { LevelData, PlayerId, PlayerState, SlotKind, WorldState } from "./types";
 
@@ -55,7 +54,7 @@ export function createPlayer(id: PlayerId, x: number, y: number): PlayerState {
 }
 
 export function createWorld(opts: CreateWorldOptions): WorldState {
-  const level: LevelData = { ...opts.level, rows: [...opts.level.rows] };
+  const level = structuredClone(opts.level);
   const p1s = tileCentre(level.spawns.p1[0], level.spawns.p1[1], MOVEMENT.bodyHeight);
   const p2s = tileCentre(level.spawns.p2[0], level.spawns.p2[1], MOVEMENT.bodyHeight);
   const world: WorldState = {
@@ -99,7 +98,7 @@ export function createWorld(opts: CreateWorldOptions): WorldState {
     breakdown: { kills: 0, coins: 0, timeBonus: 0, damageTakenPenalty: 0, reviveBonus: 0 },
     directive: opts.directive,
     nextId: 1,
-    rngState: (opts.seed ^ hashString(opts.episodeId)) >>> 0 || 1,
+    rngState: opts.seed >>> 0,
     restrictedZones: [],
     bossActive: false,
     bossPhase: 0,

@@ -19,7 +19,7 @@ export const MOVEMENT = {
 
   gravity: 1700,
   maxFallSpeed: 620,
-  jumpVelocity: -520,
+  jumpVelocity: -650,
   /** Releasing jump early caps upward speed to this (variable-height jumps). */
   jumpCutVelocity: -140,
   /** Minimum ms jump must be held before a cut applies. */
@@ -44,7 +44,7 @@ export const MOVEMENT = {
   hurtKnockbackY: -180,
 
   reviveRangePx: 40,
-  reviveHoldMs: 1200,
+  reviveHoldMs: 1500,
   reviveHealthFraction: 0.5,
   interactRangePx: 36,
 } as const;

@@ -9,14 +9,25 @@ export function rngNext(state: number): { state: number; value: number } {
   return { state: t, value };
 }
 
-export function rngRange(state: number, min: number, max: number): { state: number; value: number } {
+export function rngRange(
+  state: number,
+  min: number,
+  max: number,
+): { state: number; value: number } {
   const r = rngNext(state);
   return { state: r.state, value: min + r.value * (max - min) };
 }
 
-export function rngInt(state: number, minInclusive: number, maxExclusive: number): { state: number; value: number } {
+export function rngInt(
+  state: number,
+  minInclusive: number,
+  maxExclusive: number,
+): { state: number; value: number } {
   const r = rngNext(state);
-  return { state: r.state, value: minInclusive + Math.floor(r.value * (maxExclusive - minInclusive)) };
+  return {
+    state: r.state,
+    value: minInclusive + Math.floor(r.value * (maxExclusive - minInclusive)),
+  };
 }
 
 export function hashString(s: string): number {

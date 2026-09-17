@@ -14,7 +14,13 @@ export interface EnemyDef {
   vulnerableWhileSpecial: boolean;
   deathMs: number;
   /** Ranged attack projectile parameters, if any. */
-  ranged: { speed: number; damage: number; cooldownMs: number; telegraphMs: number; rangePx: number } | null;
+  ranged: {
+    speed: number;
+    damage: number;
+    cooldownMs: number;
+    telegraphMs: number;
+    rangePx: number;
+  } | null;
   bubbles: string[];
   bubbleIntervalMs: number;
 }
@@ -33,7 +39,12 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     vulnerableWhileSpecial: true,
     deathMs: 600,
     ranged: null,
-    bubbles: ["It's already over.", "Superintelligence by Tuesday.", "There is no point.", "I read the paper."],
+    bubbles: [
+      "It's already over.",
+      "Superintelligence by Tuesday.",
+      "There is no point.",
+      "I read the paper.",
+    ],
     bubbleIntervalMs: 3200,
   },
   catastrophe_prophet: {
@@ -49,7 +60,12 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     vulnerableWhileSpecial: false,
     deathMs: 600,
     ranged: { speed: 260, damage: 12, cooldownMs: 2200, telegraphMs: 650, rangePx: 380 },
-    bubbles: ["This changes everything!", "Six months, maximum!", "The model is certain!", "We are so back—wait, no."],
+    bubbles: [
+      "This changes everything!",
+      "Six months, maximum!",
+      "The model is certain!",
+      "We are so back—wait, no.",
+    ],
     bubbleIntervalMs: 2600,
   },
   datacenter_blockader: {
@@ -65,23 +81,33 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     vulnerableWhileSpecial: true,
     deathMs: 700,
     ranged: { speed: 200, damage: 10, cooldownMs: 2800, telegraphMs: 900, rangePx: 320 },
-    bubbles: ["Educate yourself!", "Do the work!", "I have a 47-part thread.", "Cooling towers are complicity!"],
+    bubbles: [
+      "Educate yourself!",
+      "Do the work!",
+      "I have a 47-part thread.",
+      "Cooling towers are complicity!",
+    ],
     bubbleIntervalMs: 2400,
   },
   purity_enforcer: {
     type: "purity_enforcer",
     label: "Purity Enforcer",
-    maxHealth: 140,
+    maxHealth: 120,
     width: 34,
     height: 52,
     speed: 35,
-    contactDamage: 18,
+    contactDamage: 14,
     score: 350,
     flying: false,
     vulnerableWhileSpecial: false,
     deathMs: 900,
     ranged: { speed: 340, damage: 16, cooldownMs: 3000, telegraphMs: 1000, rangePx: 260 },
-    bubbles: ["Not good enough.", "Your wording has been noted.", "Apologize better.", "The committee has concerns."],
+    bubbles: [
+      "Not good enough.",
+      "Your wording has been noted.",
+      "Apologize better.",
+      "The committee has concerns.",
+    ],
     bubbleIntervalMs: 3000,
   },
   hall_monitor: {
@@ -97,7 +123,12 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     vulnerableWhileSpecial: false,
     deathMs: 500,
     ranged: null,
-    bubbles: ["Tone detected.", "Nuance reduced reach.", "Context exceeds limit.", "Engagement falling."],
+    bubbles: [
+      "Tone detected.",
+      "Nuance reduced reach.",
+      "Context exceeds limit.",
+      "Engagement falling.",
+    ],
     bubbleIntervalMs: 2200,
   },
   reply_horde: {
@@ -123,13 +154,18 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     width: 120,
     height: 140,
     speed: 0,
-    contactDamage: 20,
+    contactDamage: 16,
     score: 2500,
     flying: true,
     vulnerableWhileSpecial: false,
     deathMs: 3000,
-    ranged: { speed: 240, damage: 14, cooldownMs: 1800, telegraphMs: 700, rangePx: 600 },
-    bubbles: ["ENGAGEMENT IS TRUTH.", "NUANCE NOT FOUND.", "EVERYONE AGREES.", "YOU ARE THE PROBLEM."],
+    ranged: { speed: 240, damage: 14, cooldownMs: 2100, telegraphMs: 900, rangePx: 600 },
+    bubbles: [
+      "ENGAGEMENT IS TRUTH.",
+      "NUANCE NOT FOUND.",
+      "EVERYONE AGREES.",
+      "YOU ARE THE PROBLEM.",
+    ],
     bubbleIntervalMs: 2000,
   },
 };
