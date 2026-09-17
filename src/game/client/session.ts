@@ -49,6 +49,7 @@ export class ClientSession {
   readonly world: WorldState;
   readonly clock = new FixedClock();
   private controllers: Record<PlayerId, PlayerController>;
+  private controllerGenerations: Record<PlayerId, number> = { p1: 0, p2: 0 };
   private bridges: HumanInputBridge[] = [];
   private paused = false;
   private disposed = false;
@@ -67,18 +68,39 @@ export class ClientSession {
     readonly developer: boolean,
   ) {
     this.world = createEpisode(options);
-    const makeController = (id: PlayerId) => createController(options.slots[id], {
-      onStatus: (status) => {
-        if (!this.disposed && id === "p2") this.jevStatus = { ...status };
-      },
-    });
-    this.controllers = { p1: makeController("p1"), p2: makeController("p2") };
+    this.controllers = { p1: this.makeController("p1"), p2: this.makeController("p2") };
     for (const controller of Object.values(this.controllers)) {
       if (controller instanceof HumanController) this.bridges.push(new HumanInputBridge(controller, settings.bindings));
     }
     this.setSettings(settings);
     audio.startMusic("level");
     if (developer) Object.defineProperty(window, "__pdoom", { configurable: true, get: () => this.debugSnapshot() });
+  }
+
+  private makeController(id: PlayerId): PlayerController {
+    const generation = ++this.controllerGenerations[id];
+    return createController(this.world.slots[id], {
+      episodeId: this.world.episodeId,
+      onStatus: (status) => {
+        if (!this.disposed && id === "p2" && generation === this.controllerGenerations[id]) {
+          this.jevStatus = { ...status };
+        }
+      },
+    });
+  }
+
+  setDirective(directive: DirectiveId): void {
+    if (this.disposed || this.world.status !== "playing" || this.world.directive === directive) return;
+    this.world.directive = directive;
+    for (const id of ["p1", "p2"] as const) {
+      const controller = this.controllers[id];
+      if (controller.kind !== "JEV" && controller.kind !== "MOCK_AI") continue;
+      this.controllerGenerations[id]++;
+      controller.dispose();
+      if (id === "p2") this.jevStatus = null;
+      this.controllers[id] = this.makeController(id);
+    }
+    this.publish();
   }
 
   setPaused(paused: boolean): void {

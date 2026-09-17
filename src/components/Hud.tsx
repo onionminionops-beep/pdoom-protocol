@@ -1,16 +1,18 @@
 import { MOVEMENT } from "@/game/config/movement";
 import { WEAPONS } from "@/game/config/weapons";
-import { DIRECTIVES } from "@/game/contracts/directives";
+import type { DirectiveId } from "@/game/contracts/directives";
 import { keyLabel, type ClientSettings } from "@/game/client/settings";
 import type { ClientSnapshot } from "@/game/client/session";
 import { CharacterMark } from "./CharacterMark";
+import { JevActions } from "./JevActions";
+import { DirectiveSelect } from "./DirectiveSelect";
 
 export function elapsedLabel(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function Hud({ snapshot, settings, onPause, onQuit }: { snapshot: ClientSnapshot; settings: ClientSettings; onPause: () => void; onQuit: () => void }) {
+export function Hud({ snapshot, settings, onPause, onQuit, onDirectiveChange }: { snapshot: ClientSnapshot; settings: ClientSettings; onPause: () => void; onQuit: () => void; onDirectiveChange: (directive: DirectiveId) => void }) {
   const { world, jevStatus } = snapshot;
   const room = world.level.rooms.find((room) => room.id === world.currentRoomId);
   const mode = world.slots.p2 === "MOCK_AI" ? "MOCK AI" : world.slots.p2 === "DISABLED" ? "DISABLED" : jevStatus?.mode.replace("_", " ").toUpperCase() ?? "CONNECTING";
@@ -31,6 +33,7 @@ export function Hud({ snapshot, settings, onPause, onQuit }: { snapshot: ClientS
             <div className="player-details">
               <div className="player-name"><strong>{id === "p1" ? "USER" : "JEV"}</strong><span>{disabled ? "DISABLED" : !player.alive ? "DEAD" : player.downed ? "DOWNED" : `${Math.ceil(player.health)} HP`}</span></div>
               <meter aria-label={`${id === "p1" ? "User" : "JEV"} health`} value={disabled ? 0 : player.health} max={MOVEMENT.maxHealth} />
+              {id === "p2" && <JevActions player={player} slot={world.slots.p2} />}
               <div className="weapon-line"><span>{WEAPONS[player.weapon].label}</span><span>{player.ammo[player.weapon] ?? "∞"} <span className="muted">AMMO</span></span></div>
               <div className="dash-line">DASH <progress aria-label={`${id} dash readiness`} max={MOVEMENT.dashCooldownMs} value={MOVEMENT.dashCooldownMs - player.dashCooldownMs} /><span>{player.dashCooldownMs > 0 ? `${(player.dashCooldownMs / 1000).toFixed(1)}s` : "READY"}</span></div>
             </div>
@@ -38,7 +41,7 @@ export function Hud({ snapshot, settings, onPause, onQuit }: { snapshot: ClientS
         })}
         <div className="run-stats"><div><span>SCORE</span><strong>{world.score.toLocaleString().padStart(5, "0")}</strong></div><div><span>COINS</span><strong className="coin-count">{world.coins.toString().padStart(2, "0")}</strong></div><div><span>TIME</span><strong>{elapsedLabel(world.elapsedMs)}</strong></div></div>
       </section>
-      <div className="mission-strip"><span><span className="signal-dot" /> {room?.objectiveText}</span><span className={`status-pill ${jevStatus?.mode ?? ""}`} title={jevStatus?.lastError ?? undefined}>{mode}{jevStatus?.lastLatencyMs != null ? ` / ${Math.round(jevStatus.lastLatencyMs)} MS` : ""}</span><span className="directive-pill">{DIRECTIVES[world.directive].hudLabel}</span></div>
+      <div className="mission-strip"><span><span className="signal-dot" /> {room?.objectiveText}</span><span className={`status-pill ${jevStatus?.mode ?? ""}`} title={jevStatus?.lastError ?? undefined}>{mode}{jevStatus?.lastLatencyMs != null ? ` / ${Math.round(jevStatus.lastLatencyMs)} MS` : ""}</span><DirectiveSelect directive={world.directive} disabled={world.slots.p2 === "DISABLED" || world.slots.p2 === "HUMAN" || world.status !== "playing"} onChange={onDirectiveChange} /></div>
       {downed && <p className="revive-prompt" role="status">{downed.id === "p1" ? "User" : "JEV"} is down. Stand nearby and hold {keyLabel(settings.bindings.interact[0])} to revive. {Math.ceil(downed.downedTimerMs / 1000)}s remaining.</p>}
     </>
   );
