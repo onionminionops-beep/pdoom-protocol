@@ -1,4 +1,20 @@
-export function CharacterMark({ jev = false }: { jev?: boolean }) {
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
+import manifest from "../../public/art/manifest.json";
+
+export function CharacterMark({ jev = false, fullBody = false }: { jev?: boolean; fullBody?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const sheet = manifest.characters[jev ? "jev" : "user"];
+  if (!failed && fullBody) {
+    return <svg className="character-mark full-body" viewBox={`0 0 ${sheet.frameWidth} ${sheet.frameHeight}`} aria-hidden="true">
+      <image href={`/art/${sheet.file}`} width={sheet.frameWidth * Math.max(...sheet.anims.map((anim) => anim.frames))} height={sheet.frameHeight * sheet.anims.length} onError={() => setFailed(true)} />
+    </svg>;
+  }
+  if (!failed) {
+    return <Image className="character-mark portrait" src={`/art/${jev ? manifest.ui.portraitJev : manifest.ui.portraitUser}`} width={96} height={96} alt="" unoptimized onError={() => setFailed(true)} />;
+  }
   return (
     <svg viewBox="0 0 48 64" fill="none" aria-hidden="true" className="character-mark" shapeRendering="crispEdges">
       <path d="M10 7h27v20H10zM7 29h31v22H7z" fill={jev ? "var(--magenta)" : "var(--cyan)"} />

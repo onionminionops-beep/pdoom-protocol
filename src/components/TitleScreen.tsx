@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+import manifest from "../../public/art/manifest.json";
 import { DIRECTIVES, type DirectiveId } from "@/game/contracts/directives";
 import type { SessionOptions } from "@/game/client/session";
 import type { SlotKind } from "@/game/sim/types";
@@ -13,6 +16,7 @@ export function TitleScreen({ options, onOptions, onStart, onSettings }: {
   onSettings: () => void;
 }) {
   const directive = DIRECTIVES[options.directive];
+  const [logoFailed, setLogoFailed] = useState(false);
   return (
     <main className="title-screen">
       <header className="site-header">
@@ -27,8 +31,9 @@ export function TitleScreen({ options, onOptions, onStart, onSettings }: {
           <p className="title-description">One human. One AI. Same controls.<br />Fight through the noise. Restore independent thought.</p>
           <div className="title-art" aria-label="User and JEV standing above the Consensus Heights skyline" role="img">
             <div className="city-grid" />
-            <div className="city-block city-one" /><div className="city-block city-two" /><div className="city-block city-three" />
-            <div className="hero-pair"><CharacterMark /><CharacterMark jev /></div>
+            {Object.entries(manifest.backdrops).map(([key, layer]) => <div key={key} className={`title-backdrop ${key}`} style={{ backgroundImage: `url("/art/${layer.file}")`, backgroundSize: `${layer.width}px ${layer.height}px` }} />)}
+            {!logoFailed && <Image className="title-crest" src={`/art/${manifest.ui.logo}`} width={384} height={128} alt="" unoptimized onError={() => setLogoFailed(true)} />}
+            <div className="hero-pair"><CharacterMark fullBody /><CharacterMark jev fullBody /></div>
             <span className="art-caption">TWO PLAYERS / ONE SHARED REALITY</span>
           </div>
         </section>
