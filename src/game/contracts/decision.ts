@@ -50,6 +50,7 @@ export const SessionResponseSchema = z.object({
   sessionToken: z.string(),
   expiresAt: z.number(),
   requestBudget: z.number().int(),
+  minDecisionIntervalMs: z.number().int().positive().optional(),
 });
 export type SessionResponse = z.infer<typeof SessionResponseSchema>;
 

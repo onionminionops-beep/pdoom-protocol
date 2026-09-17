@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { DecisionRequestSchema, SessionResponseSchema } from "@/game/contracts/decision";
+import { AI_CONFIG } from "@/game/config/ai";
 import { getJevConfig } from "./config";
 import { errorResponse, JevApiError } from "./errors";
 import { clientIpKey, readJson, validateOrigin } from "./http";
@@ -21,6 +22,9 @@ export async function handleSession(request: Request): Promise<Response> {
     await limits.register(claims);
     return Response.json(SessionResponseSchema.parse({
       sessionToken: token, expiresAt: claims.expiresAt, requestBudget: claims.budget,
+      minDecisionIntervalMs: Math.ceil(Math.max(
+        AI_CONFIG.minIntervalMs, 60000 / config.ipPerMinute,
+      ) * 11 / 10),
     }), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return errorResponse(error);

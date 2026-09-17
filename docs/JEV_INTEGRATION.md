@@ -48,7 +48,9 @@ deployment to memory.
    host, JSON and the session issuance budget. It registers a random session ID and
    issues a 30-minute HMAC-SHA256 token containing version, ID, episode, expiry and
    request budget. The response is the existing `SessionResponseSchema`:
-   `{ sessionToken, expiresAt, requestBudget }`.
+   `{ sessionToken, expiresAt, requestBudget, minDecisionIntervalMs }`.
+   The advertised interval is advisory client pacing; all server budget checks
+   still apply to every request.
 2. `POST /api/jev/decision` accepts the existing `DecisionRequestSchema`:
    `{ sessionToken, observation }`. The body is capped at 32 KiB even when
    Content-Length is missing; the session body cap is 1 KiB.
@@ -122,6 +124,8 @@ Exports from `src/game/controllers/jev.ts`:
   `episodeId` and monotonic `now` for initialization/testing.
 - `JevStatus`: existing modes `connecting`, `live`, `waiting`, `fallback_mock`,
   `error`, plus latency, request ID/count, consecutive failures and error code.
+  Additive optional fields `minDecisionIntervalMs` and `lastRoundTripMs` expose
+  the server pacing floor and total browser request/response time.
 - `JevLastDecision`: `DecisionResponse` plus the `observation` sent.
 
 Construct in browser lifecycle code and dispose on unmount or controller change:
@@ -149,12 +153,24 @@ not a failed or discarded response.
 
 The controller polls from `update`, never from a separate simulation clock. It
 keeps exactly one session/decision request in flight, with a 2-second browser
-timeout. It schedules the next decision from the previous request start using
-`max(minIntervalMs, holdForMs, measuredLatency * 1.2)`. The minimum is 100 ms.
-The previous input continues while awaiting a response, but becomes neutral once
-its observation is older than 400 ms or 45 ticks. A response must match its sent
-episode and tick and satisfy both age limits. No world fields are read directly:
-all decisions use `buildObservation`.
+timeout. After the initial session connection, the first decision can start at
+100 ms. Subsequent decisions use a start-to-start interval of
+`max(minIntervalMs, session.minDecisionIntervalMs, holdForMs, roundTripMs * 1.2)`.
+The server pacing floor is reserved before sending, so failures and stale
+responses cannot trigger earlier retries. Server `retryAfterMs` and failure
+backoff can lengthen the wait. The optional session field preserves rolling
+compatibility: an older server without it retains the controller's previous
+100 ms floor. Deploy the new controller and session handler together.
+
+A response must match its sent episode and tick and arrive within **750 ms and
+45 ticks** of the observation. Receipt never resets these hard observation-age
+caps. A received input expires after its requested 100–250 ms hold, capped by
+`staleMs` (400 ms since receipt) and the remaining observation lifetime.
+The previous input can continue while awaiting another response only within
+those bounds. Otherwise the controller emits neutral input, preserving the
+original `basedOnTick` for accepted actions. There is no prediction, tick
+retagging, automatic aiming or mock input inserted into successful live gaps.
+No world fields are read directly: all decisions use `buildObservation`.
 
 Four consecutive failures activate `MockAIController`. Live retries occur every
 15 seconds while mock input continues. A valid fresh response restores live mode.
@@ -164,12 +180,56 @@ exhausted session stays in mock mode until expiry rather than continually
 requesting new tokens. Session and decision attempts never overlap, including
 episode changes and disposal.
 
-The default 120/minute IP budget intentionally permits less traffic than the
-100 ms minimum cadence. Tune the budget for desired live play and API spend;
-rate denials cause backoff. Increasing only the server timeout cannot make the
-client accept older observations: freshness limits are independent. Client
-network timeout/cadence/freshness settings live in `AI_CONFIG`, not environment
-variables.
+### Cadence assessment
+
+The old 100–250 ms cadence could consume the default IP allowance in about
+12–30 seconds at low latency. This follows from the code's request interval and
+120/minute budget; it is not a deployed load-test result.
+
+Each session now advertises:
+
+```text
+ceil(1.10 * max(
+  100 ms,
+  60,000 ms / per-IP requests per minute
+))
+```
+
+Defaults remain 120/minute per IP, 1,200/session, a 30-minute TTL and 20,000/day
+globally. The default **550 ms** spacing provides 10% time headroom over the
+500 ms IP floor, or about 109 requests/minute. The target game slice is 6–10
+minutes, so pacing is not stretched to consume the full 30-minute token TTL.
+At this cadence the session budget lasts roughly 11 minutes of continuous
+requests. Exhausting it switches to the visible mock fallback until the session
+expires; the controller does not acquire replacement tokens to bypass the cap.
+
+A fake-clock test spans ten minutes with 150 ms responses: 1,091 requests, at
+most 110 in any sliding minute, no overlap and no premature budget exhaustion.
+Tests also cover a stricter IP budget, failures, slow responses, short holds,
+session exhaustion and independent wall-clock/tick cutoffs. These are deterministic
+controller tests, not deployment measurements.
+
+This deliberately produces visible neutral gaps: at steady 550 ms cadence and
+equal response latency, the 100–250 ms holds leave 300–450 ms gaps. Slower
+responses and freshness cutoffs can lengthen them. Extending an action to cover
+the gap would change the requested behavior. `live` means live API mode, not
+that an input remains active. Multiple clients sharing an IP or the global daily
+allowance can still receive 429 responses. Pacing is advisory and does not
+reserve a share of those common budgets.
+
+The recorded TypeSafe request below measures adapter inference latency only.
+Parent integration separately reported a 174 ms local TypeSafe call. Neither
+measurement includes deployed Upstash and browser/Vercel transit.
+The new 750 ms acceptance window aligns with the existing 45-tick ceiling at
+60 Hz; its adequacy for production latency is a hypothesis pending deployed
+measurements. `lastRoundTripMs` includes storage, transit, inference and response
+parsing; `lastLatencyMs` remains server inference time. Round-trip measurements
+are published even when a parsed response is rejected as stale, so the HUD/dev
+panel can expose the gap.
+
+Increasing the server timeout alone cannot make the client accept older
+observations. Client network timeout/freshness settings live in `AI_CONFIG`;
+all security budgets and their enforcement remain unchanged.
 
 ## Mock-only use
 
@@ -252,13 +312,15 @@ The applied input was `right` / `none`, shoot `true`, dash `false`, interact
 ## Parent-track follow-ups
 
 Wire the controller and HUD/dev panel into the client track, supplying the world
-episode ID at construction. Keep `input` as the wire response field. No shared
-contract shape was changed. `AI_CONFIG.confidenceThresholds.duration` is additive.
+episode ID at construction. Keep `input` as the wire response field. The session
+contract adds optional `minDecisionIntervalMs`; existing fields are unchanged.
+`AI_CONFIG.confidenceThresholds.duration` and `maxResponseAgeMs` are additive.
 The only dependency addition is `server-only@0.0.1`; reconcile lockfile changes
 when integrating other tracks. The placeholder-only `.env.example` is explicitly
 tracked despite the starter's `.env*` ignore rule.
 
 Configure production secrets and Upstash plus allowed origins before rollout.
 Redis behavior is unit-tested with mocks; a real Upstash deployment and browser
-gameplay have not been exercised in this track. Tune request budgets, cadence and
-confidence thresholds against gameplay after the client track is integrated.
+gameplay have not been exercised in this track. Parent owns provisioning and
+client integration. Measure deployed round-trip latency before further freshness
+tuning; the pacing update does not raise any budget.
