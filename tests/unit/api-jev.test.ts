@@ -357,6 +357,147 @@ describe("decision route", () => {
   });
 });
 
+describe("temporary Preview bypass", () => {
+  beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-only");
+    mocks.requestDecision.mockResolvedValue({
+      input: neutralInput("ep-test", 0),
+    } satisfies Partial<DecisionResponse>);
+  });
+
+  it("issues unlimited metadata, retains positive signed budgets and skips all budget gates", async () => {
+    for (let i = 0; i < 6; i++) {
+      const result = await session();
+      expect(result.requestBudget).toBeNull();
+      expect(result.minDecisionIntervalMs).toBe(100);
+      expect(verifySession(result.sessionToken, getJevConfig().secret).budget).toBe(2);
+      for (let tick = 0; tick < 10; tick++) {
+        const response = await decisionPost(
+          request({ sessionToken: result.sessionToken, observation: { ...observation(), tick } }),
+        );
+        expect(response.status).toBe(200);
+      }
+    }
+    expect(mocks.requestDecision).toHaveBeenCalledTimes(60);
+  });
+
+  it("preserves atomic ticks, signed sessions, episodes, origin and payload checks", async () => {
+    const { sessionToken } = await session();
+    const obs = observation();
+    const responses = await Promise.all(
+      [1, 2].map(() => decisionPost(request({ sessionToken, observation: obs }))),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    mocks.requestDecision.mockClear();
+    for (const body of [
+      { sessionToken: issueSession("ep-test", getJevConfig()).token, observation: obs },
+      { sessionToken: issueSession("ep-test", getJevConfig(), 0).token, observation: obs },
+      { sessionToken: sessionToken + "x", observation: obs },
+      { sessionToken, observation: { ...obs, episodeId: "other" } },
+    ]) {
+      await expectError(await decisionPost(request(body)), 401, "invalid_session");
+    }
+    await expectError(
+      await decisionPost(request({ sessionToken, observation: { ...obs, tick: -1 } })),
+      400,
+      "invalid_request",
+    );
+    await expectError(
+      await decisionPost(
+        request({ sessionToken, observation: obs }, { origin: "https://evil.example" }),
+      ),
+      403,
+      "forbidden_origin",
+    );
+    await expectError(
+      await sessionPost(request({ episodeId: "ep-test" }, { origin: "https://evil.example" })),
+      403,
+      "forbidden_origin",
+    );
+    await expectError(
+      await decisionPost(request({ sessionToken, observation: obs, padding: "x".repeat(33000) })),
+      413,
+      "payload_too_large",
+    );
+    expect(mocks.requestDecision).not.toHaveBeenCalled();
+  });
+
+  it.each(["remove flag", "production"] as const)(
+    "restores the signed session cap for an existing unlimited token on %s",
+    async (restore) => {
+      const { sessionToken } = await session();
+      for (let tick = 0; tick < 3; tick++) {
+        expect(
+          (await decisionPost(request({ sessionToken, observation: { ...observation(), tick } })))
+            .status,
+        ).toBe(200);
+      }
+      if (restore === "remove flag") vi.stubEnv("JEV_DISABLE_LIMITS", undefined);
+      else vi.stubEnv("VERCEL_ENV", "production");
+      await expectError(
+        await decisionPost(request({ sessionToken, observation: { ...observation(), tick: 3 } })),
+        429,
+        "session_budget_exhausted",
+      );
+      const limited = await session();
+      expect(limited.requestBudget).toBe(2);
+      expect(limited.minDecisionIntervalMs).toBe(13200);
+      expect(mocks.requestDecision).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it.each(["production", "development", "staging", undefined])(
+    "ignores the bypass flag in %s and enforces issuance and session budgets",
+    async (environment) => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", environment);
+      const result = await session();
+      expect(result.requestBudget).toBe(2);
+      expect(result.minDecisionIntervalMs).toBe(13200);
+      await session();
+      await expectError(await sessionPost(request({ episodeId: "ep-test" })), 429, "rate_limited");
+      for (let tick = 0; tick < 2; tick++) {
+        expect(
+          (
+            await decisionPost(
+              request({
+                sessionToken: result.sessionToken,
+                observation: { ...observation(), tick },
+              }),
+            )
+          ).status,
+        ).toBe(200);
+      }
+      await expectError(
+        await decisionPost(
+          request({
+            sessionToken: result.sessionToken,
+            observation: { ...observation(), tick: 2 },
+          }),
+        ),
+        429,
+        "session_budget_exhausted",
+      );
+    },
+  );
+
+  it("still fails closed without Preview storage", async () => {
+    const { sessionToken } = await session();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    await expectError(await sessionPost(request({ episodeId: "ep-test" })), 503, "misconfigured");
+    await expectError(
+      await decisionPost(request({ sessionToken, observation: observation() })),
+      503,
+      "misconfigured",
+    );
+    expect(mocks.requestDecision).not.toHaveBeenCalled();
+  });
+});
+
 it("keeps secret identifiers out of client code", () => {
   const roots = ["src/game", "src/app/play", "src/components"];
   for (const root of roots.filter(existsSync)) {

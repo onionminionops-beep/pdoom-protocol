@@ -111,6 +111,49 @@ describe("in-memory budgets", () => {
     expect(getJevLimits(config)).toBe(first);
     expect(warn).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["remove flag", "production"] as const)(
+    "bypasses memory budgets without bypassing session integrity, then restores on %s",
+    async (restore) => {
+      vi.stubEnv("VERCEL_ENV", "preview");
+      vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+      let now = 1000;
+      const limits = new MemoryJevLimits(config, () => now);
+      const claims = issueSession("ep-test", config, now).claims;
+      await expect(limits.claim(claims, 0)).rejects.toMatchObject({ code: "invalid_session" });
+      await limits.register(claims);
+      await expect(limits.claim({ ...claims, episodeId: "other" }, 0)).rejects.toMatchObject({
+        code: "invalid_session",
+      });
+      for (let tick = 0; tick < 10; tick++) {
+        await limits.limitIp("same-ip", true);
+        await limits.limitIp("same-ip", false);
+        await limits.claim(claims, tick);
+      }
+      const concurrent = await Promise.allSettled([
+        limits.claim(claims, 10),
+        limits.claim(claims, 10),
+      ]);
+      expect(concurrent.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
+      expect(concurrent[1]).toMatchObject({
+        reason: { code: "invalid_request" },
+      });
+      await expect(limits.claim(claims, 9)).rejects.toMatchObject({ code: "invalid_request" });
+      if (restore === "remove flag") vi.stubEnv("JEV_DISABLE_LIMITS", undefined);
+      else vi.stubEnv("VERCEL_ENV", "production");
+      await expect(limits.claim(claims, 11)).rejects.toMatchObject({
+        code: "session_budget_exhausted",
+      });
+      await limits.limitIp("same-ip", true);
+      await expect(limits.limitIp("same-ip", true)).rejects.toMatchObject({
+        code: "rate_limited",
+      });
+      vi.stubEnv("VERCEL_ENV", "preview");
+      vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+      now = claims.expiresAt;
+      await expect(limits.claim(claims, 11)).rejects.toMatchObject({ code: "invalid_session" });
+    },
+  );
 });
 
 describe("Redis-backed budgets", () => {
@@ -140,7 +183,7 @@ describe("Redis-backed budgets", () => {
       enableAutoPipelining: false,
     });
     const evalScript = vi.spyOn(redis, "eval").mockResolvedValue(1);
-    return { limits: new RedisJevLimits(config, redis), evalScript };
+    return { limits: new RedisJevLimits(config, redis), evalScript, redis };
   }
 
   it("honors per-IP and session issuance denial", async () => {
@@ -204,7 +247,7 @@ describe("Redis-backed budgets", () => {
     expect(evalScript).toHaveBeenCalledWith(
       expect.any(String),
       [`jev:session:${session.id}`],
-      [session.episodeId, 5, expect.any(Number), session.budget],
+      [session.episodeId, 5, expect.any(Number), session.budget, 0],
     );
     expect(windows.daily).toHaveBeenCalledWith("all");
   });
@@ -216,5 +259,84 @@ describe("Redis-backed budgets", () => {
       "storage down",
     );
     expect(windows.daily).not.toHaveBeenCalled();
+  });
+
+  it.each(["remove flag", "production"] as const)(
+    "keeps Redis registration and atomic claims while bypassing budgets, then restores on %s",
+    async (restore) => {
+      vi.stubEnv("VERCEL_ENV", "preview");
+      vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+      const { limits, evalScript, redis } = backend();
+      const session = issueSession("ep-test", config).claims;
+      const transaction = redis.multi();
+      const hset = vi.spyOn(transaction, "hset");
+      const expires = vi.spyOn(transaction, "pexpireat");
+      const exec = vi.spyOn(transaction, "exec").mockResolvedValue([]);
+      vi.spyOn(redis, "multi").mockReturnValue(transaction);
+      await limits.register(session);
+      expect(hset).toHaveBeenCalledWith(`jev:session:${session.id}`, {
+        episode: session.episodeId,
+        expires: session.expiresAt,
+        tick: -1,
+        used: 0,
+        budget: session.budget,
+      });
+      expect(expires).toHaveBeenCalledWith(`jev:session:${session.id}`, session.expiresAt);
+      expect(exec).toHaveBeenCalledOnce();
+      for (let tick = 0; tick < 10; tick++) {
+        await limits.limitIp("same-ip", true);
+        await limits.limitIp("same-ip", false);
+        await limits.claim(session, tick);
+      }
+      expect(evalScript).toHaveBeenCalledTimes(10);
+      expect(evalScript).toHaveBeenLastCalledWith(
+        expect.any(String),
+        [`jev:session:${session.id}`],
+        [session.episodeId, 9, expect.any(Number), session.budget, 1],
+      );
+      for (const limiter of Object.values(windows)) expect(limiter).not.toHaveBeenCalled();
+      if (restore === "remove flag") vi.stubEnv("JEV_DISABLE_LIMITS", undefined);
+      else vi.stubEnv("VERCEL_ENV", "production");
+      await limits.limitIp("same-ip", true);
+      await limits.limitIp("same-ip", false);
+      await limits.claim(session, 10);
+      expect(evalScript).toHaveBeenLastCalledWith(
+        expect.any(String),
+        [`jev:session:${session.id}`],
+        [session.episodeId, 10, expect.any(Number), session.budget, 0],
+      );
+      expect(windows.ip).toHaveBeenCalledWith("same-ip");
+      expect(windows.issuance).toHaveBeenCalledWith("same-ip");
+      expect(windows.daily).toHaveBeenCalledWith("all");
+      evalScript.mockResolvedValue(-3);
+      await expect(limits.claim(session, 11)).rejects.toMatchObject({
+        code: "session_budget_exhausted",
+      });
+    },
+  );
+
+  it.each([
+    [-1, "invalid_session"],
+    [-2, "invalid_request"],
+    [0, "upstream_unavailable"],
+  ])("keeps Redis integrity failure %s in unlimited Preview mode", async (result, code) => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+    const { limits, evalScript } = backend();
+    evalScript.mockResolvedValue(result);
+    await expect(limits.claim(issueSession("ep-test", config).claims, 5)).rejects.toMatchObject({
+      code,
+    });
+    expect(windows.daily).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on Redis errors even with the Preview bypass", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("JEV_DISABLE_LIMITS", "1");
+    const { limits, evalScript } = backend();
+    evalScript.mockRejectedValue(new Error("storage down"));
+    await expect(limits.claim(issueSession("ep-test", config).claims, 5)).rejects.toThrow(
+      "storage down",
+    );
   });
 });

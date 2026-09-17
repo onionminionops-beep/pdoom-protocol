@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { DecisionRequestSchema, SessionResponseSchema } from "@/game/contracts/decision";
 import { AI_CONFIG } from "@/game/config/ai";
-import { getJevConfig } from "./config";
+import { getJevConfig, jevLimitsDisabled } from "./config";
 import { errorResponse, JevApiError } from "./errors";
 import { clientIpKey, readJson, validateOrigin } from "./http";
 import { getJevLimits } from "./limits";
@@ -20,14 +20,15 @@ export async function handleSession(request: Request): Promise<Response> {
     await limits.limitIp(clientIpKey(request, config), true);
     const { token, claims } = issueSession(body.episodeId, config);
     await limits.register(claims);
+    const disabled = jevLimitsDisabled();
     return Response.json(
       SessionResponseSchema.parse({
         sessionToken: token,
         expiresAt: claims.expiresAt,
-        requestBudget: claims.budget,
-        minDecisionIntervalMs: Math.ceil(
-          (Math.max(AI_CONFIG.minIntervalMs, 60000 / config.ipPerMinute) * 11) / 10,
-        ),
+        requestBudget: disabled ? null : claims.budget,
+        minDecisionIntervalMs: disabled
+          ? AI_CONFIG.minIntervalMs
+          : Math.ceil((Math.max(AI_CONFIG.minIntervalMs, 60000 / config.ipPerMinute) * 11) / 10),
       }),
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getJevConfig } from "@/server/jev/config";
+import { getJevConfig, jevLimitsDisabled } from "@/server/jev/config";
 
 vi.mock("server-only", () => ({}));
 
@@ -60,5 +60,27 @@ it.each(["KV_REST_API_URL", "KV_REST_API_TOKEN"])(
 );
 
 it("fails closed with no Redis credentials in a deployed runtime", () => {
+  expect(() => getJevConfig()).toThrow("Jev storage is not configured.");
+});
+
+it.each([
+  ["preview", "1", true],
+  ["preview", undefined, false],
+  ["preview", "0", false],
+  ["preview", "true", false],
+  ["production", "1", false],
+  ["development", "1", false],
+  ["staging", "1", false],
+  ["", "1", false],
+  [undefined, "1", false],
+] as const)("scopes limits bypass to environment=%s flag=%s", (environment, flag, disabled) => {
+  vi.stubEnv("VERCEL_ENV", environment);
+  vi.stubEnv("JEV_DISABLE_LIMITS", flag);
+  expect(jevLimitsDisabled()).toBe(disabled);
+});
+
+it("still requires Redis when Preview budgets are disabled", () => {
+  vi.stubEnv("VERCEL_ENV", "preview");
+  vi.stubEnv("JEV_DISABLE_LIMITS", "1");
   expect(() => getJevConfig()).toThrow("Jev storage is not configured.");
 });

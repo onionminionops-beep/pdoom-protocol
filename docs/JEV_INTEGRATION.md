@@ -48,6 +48,29 @@ returning a cached limiter. Partial Redis configuration also fails closed, as do
 Redis errors and rate limiter timeouts; storage failures never switch a configured
 deployment to memory.
 
+### Temporary Preview bypass
+
+Set the server-only `JEV_DISABLE_LIMITS=1` on the intended Vercel Preview deployment
+to temporarily skip IP decision, session issuance, global daily and per-session
+budget gates. It is effective only when `VERCEL_ENV` is exactly `preview`;
+production, development and unknown environments retain their limits even with
+the flag set. Redis remains required on Preview.
+
+Unlimited session responses advertise `requestBudget: null` and
+`minDecisionIntervalMs: 100`. Signed tokens still contain the normal positive
+session budget. Registration, atomic monotonic tick/episode/expiry checks, HMAC,
+origin/host and payload validation remain enforced. Session usage still increments;
+IP/issuance/daily limiter calls are skipped. The client keeps one request in flight,
+adaptive pacing, selected 100–250 ms holds and the 750 ms/45-tick freshness caps.
+The advertised 100 ms is a minimum, not a promised request frequency.
+
+To restore limits, remove `JEV_DISABLE_LIMITS` from the Preview environment and
+redeploy. New sessions advertise the normal budget and pacing. Previously issued
+tokens gain no permanent exemption: normal limits apply immediately in the restored
+runtime, including the stored session usage. Start a new game to refresh the
+client's advertised pacing. Existing deployments retain their own environment
+configuration until replaced.
+
 ## Request flow
 
 1. `POST /api/jev/session` accepts `{ "episodeId": "..." }`. It validates origin,
@@ -56,7 +79,7 @@ deployment to memory.
    request budget. The response is the existing `SessionResponseSchema`:
    `{ sessionToken, expiresAt, requestBudget, minDecisionIntervalMs }`.
    The advertised interval is advisory client pacing; all server budget checks
-   still apply to every request.
+   still apply to every request unless the temporary Preview bypass is effective.
 2. `POST /api/jev/decision` accepts the existing `DecisionRequestSchema`:
    `{ sessionToken, observation }`. The body is capped at 32 KiB even when
    Content-Length is missing; the session body cap is 1 KiB.
@@ -95,12 +118,12 @@ episode. A token cannot be used with another episode.
 
 | `QuestionId`        | Choices                            | Threshold / fallback |
 | ------------------- | ---------------------------------- | -------------------- |
-| `horizontal_input`  | `left`, `neutral`, `right`         | `0.40` / `neutral`   |
-| `vertical_action`   | `none`, `jump`, `drop`             | `0.45` / `none`      |
+| `horizontal_input`  | `left`, `neutral`, `right`         | `0.20` / `neutral`   |
+| `vertical_action`   | `none`, `jump`, `drop`             | `0.20` / `none`      |
 | `shoot_input`       | `"true"`, `"false"`                | `0.50` / `false`     |
 | `dash_input`        | `"true"`, `"false"`                | `0.55` / `false`     |
 | `interaction_input` | `"true"`, `"false"`                | `0.50` / `false`     |
-| `input_duration`    | `"100"`, `"150"`, `"200"`, `"250"` | `0.40` / `100` ms    |
+| `input_duration`    | `"100"`, `"150"`, `"200"`, `"250"` | `0.10` / `100` ms    |
 
 Each question combines a base instruction with
 `DIRECTIVES[obs.directive.id].instructionOverrides[questionId]`. Overrides are
@@ -195,7 +218,7 @@ The old 100–250 ms cadence could consume the default IP allowance in about
 12–30 seconds at low latency. This follows from the code's request interval and
 120/minute budget; it is not a deployed load-test result.
 
-Each session now advertises:
+With limits enabled, each session advertises:
 
 ```text
 ceil(1.10 * max(
@@ -327,14 +350,17 @@ This is one observation, not a gameplay benchmark. The actual response was:
 }
 ```
 
-The applied input was `right` / `none`, shoot `true`, dash `false`, interact
-`false`, hold `100` ms. The low-confidence dash and duration were gated.
+The original verification applied `right` / `none`, shoot `true`, dash `false`,
+interact `false`, hold `100` ms. With the calibrated duration threshold of `0.10`,
+the same sample's `0.12` confidence now accepts its selected `250` ms hold.
+The low-confidence dash remains gated.
 
 ## Parent-track follow-ups
 
 Wire the controller and HUD/dev panel into the client track, supplying the world
 episode ID at construction. Keep `input` as the wire response field. The session
-contract adds optional `minDecisionIntervalMs`; existing fields are unchanged.
+contract adds optional `minDecisionIntervalMs` and nullable `requestBudget`.
+Deploy the session handler and null-aware controller together for the Preview bypass.
 `AI_CONFIG.confidenceThresholds.duration` and `maxResponseAgeMs` are additive.
 The only dependency addition is `server-only@0.0.1`; reconcile lockfile changes
 when integrating other tracks. The placeholder-only `.env.example` is explicitly
@@ -344,4 +370,5 @@ Configure production secrets and Upstash plus allowed origins before rollout.
 Redis behavior is unit-tested with mocks; a real Upstash deployment and browser
 gameplay have not been exercised in this track. Parent owns provisioning and
 client integration. Measure deployed round-trip latency before further freshness
-tuning; the pacing update does not raise any budget.
+tuning. The normal pacing update does not raise any budget; the temporary Preview
+flag explicitly bypasses budget gates only on the deployments where it is enabled.
