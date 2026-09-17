@@ -1,0 +1,1025 @@
+{
+  "version": 1,
+  "generatedBy": "gpt-image-2",
+  "characters": {
+    "user": {
+      "key": "user",
+      "file": "user.png",
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "idle_personality",
+          "row": 1,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "run",
+          "row": 2,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "skid",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "jump",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "land",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "shoot",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dash",
+          "row": 8,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 9,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "downed",
+          "row": 10,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "revive",
+          "row": 11,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "being_revived",
+          "row": 12,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "victory",
+          "row": 13,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "death",
+          "row": 14,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        }
+      ]
+    },
+    "jev": {
+      "key": "jev",
+      "file": "jev.png",
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "idle_personality",
+          "row": 1,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "run",
+          "row": 2,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "skid",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "jump",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "land",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "shoot",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dash",
+          "row": 8,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 9,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "downed",
+          "row": 10,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "revive",
+          "row": 11,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "being_revived",
+          "row": 12,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "victory",
+          "row": 13,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "death",
+          "row": 14,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        }
+      ]
+    }
+  },
+  "enemies": {
+    "doom_prophet": {
+      "key": "doom_prophet",
+      "file": "doom_prophet.png",
+      "frameWidth": 22,
+      "frameHeight": 40,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "catastrophe_prophet": {
+      "key": "catastrophe_prophet",
+      "file": "catastrophe_prophet.png",
+      "frameWidth": 22,
+      "frameHeight": 42,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "datacenter_blockader": {
+      "key": "datacenter_blockader",
+      "file": "datacenter_blockader.png",
+      "frameWidth": 26,
+      "frameHeight": 44,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "purity_enforcer": {
+      "key": "purity_enforcer",
+      "file": "purity_enforcer.png",
+      "frameWidth": 34,
+      "frameHeight": 52,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "hall_monitor": {
+      "key": "hall_monitor",
+      "file": "hall_monitor.png",
+      "frameWidth": 28,
+      "frameHeight": 24,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "reply_horde": {
+      "key": "reply_horde",
+      "file": "reply_horde.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "consensus_engine": {
+      "key": "consensus_engine",
+      "file": "consensus_engine.png",
+      "frameWidth": 120,
+      "frameHeight": 140,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "idle",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        },
+        {
+          "name": "move",
+          "row": 1,
+          "frames": 4,
+          "fps": 12,
+          "loop": true
+        },
+        {
+          "name": "telegraph",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "attack",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "recover",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "hurt",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dying",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "special",
+          "row": 7,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    }
+  },
+  "props": {
+    "coin": {
+      "key": "coin",
+      "file": "coin.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "health": {
+      "key": "health",
+      "file": "health.png",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "ammo": {
+      "key": "ammo",
+      "file": "ammo.png",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "fact_check": {
+      "key": "fact_check",
+      "file": "fact_check.png",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "weapon_crate": {
+      "key": "weapon_crate",
+      "file": "weapon_crate.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "switch": {
+      "key": "switch",
+      "file": "switch.png",
+      "frameWidth": 24,
+      "frameHeight": 32,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "off",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "on",
+          "row": 1,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        }
+      ]
+    },
+    "exit": {
+      "key": "exit",
+      "file": "exit.png",
+      "frameWidth": 64,
+      "frameHeight": 96,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "spin",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": true
+        }
+      ]
+    },
+    "projectiles": {
+      "key": "projectiles",
+      "file": "projectiles.png",
+      "frameWidth": 24,
+      "frameHeight": 16,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "blaster",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "shotgun",
+          "row": 1,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "launcher",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "enemy_graph",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "enemy_bubble",
+          "row": 4,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "enemy_shockwave",
+          "row": 5,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "enemy_boss",
+          "row": 6,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        }
+      ]
+    },
+    "fx": {
+      "key": "fx",
+      "file": "fx.png",
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "originOffset": {
+        "x": 0,
+        "y": 0
+      },
+      "anims": [
+        {
+          "name": "impact",
+          "row": 0,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "explosion",
+          "row": 1,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "pulse",
+          "row": 2,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        },
+        {
+          "name": "dash",
+          "row": 3,
+          "frames": 4,
+          "fps": 8,
+          "loop": false
+        }
+      ]
+    }
+  },
+  "tileset": {
+    "key": "tiles",
+    "file": "tiles.png",
+    "tileSize": 32,
+    "columns": 8,
+    "tiles": {
+      "solid": [
+        0
+      ],
+      "oneway": [
+        1
+      ],
+      "hazard": [
+        2
+      ],
+      "gate": [
+        3
+      ],
+      "solid_top": [
+        4
+      ],
+      "solid_left": [
+        5
+      ],
+      "solid_right": [
+        6
+      ],
+      "solid_inner": [
+        7
+      ]
+    }
+  },
+  "backdrops": {
+    "bg_far": {
+      "file": "bg_far.png",
+      "width": 640,
+      "height": 360,
+      "parallax": 0.12
+    },
+    "bg_mid": {
+      "file": "bg_mid.png",
+      "width": 640,
+      "height": 360,
+      "parallax": 0.35
+    },
+    "bg_near": {
+      "file": "bg_near.png",
+      "width": 640,
+      "height": 360,
+      "parallax": 0.65
+    }
+  },
+  "billboards": {
+    "file": "billboards.png",
+    "frameWidth": 192,
+    "frameHeight": 80,
+    "count": 3
+  },
+  "ui": {
+    "font": "monospace",
+    "portraitUser": "portrait_user.png",
+    "portraitJev": "portrait_jev.png",
+    "logo": "logo.png"
+  }
+}

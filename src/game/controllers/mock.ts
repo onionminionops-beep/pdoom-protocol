@@ -32,7 +32,8 @@ export class MockAIController implements PlayerController {
     const self = obs.self;
     const facingSign = self.facing === "right" ? 1 : -1;
     let horizontal: PlayerInputV1["horizontal"] = "right";
-    let verticalAction: PlayerInputV1["verticalAction"] = "none";
+    let verticalAction: PlayerInputV1["verticalAction"] =
+      self.jumpHeld && !self.grounded && self.velocity.y < 0 ? "jump" : "none";
     let shoot = false;
     let dash = false;
     let interact = false;
@@ -48,7 +49,7 @@ export class MockAIController implements PlayerController {
 
     // Directive-flavoured goal choice (all via observation only)
     const wantCoins = obs.directive.id === "COLLECTOR";
-    const wantKills = obs.directive.id === "SCORE_HUNTER";
+    const wantKills = obs.directive.id === "SCORE_HUNTER" || obs.directive.id === "MONSTER_SLAYER";
     const guardian = obs.directive.id === "GUARDIAN";
     const coin = obs.pickups.find((p) => p.type === "coin");
     const teammate = obs.teammate;
