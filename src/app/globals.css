@@ -1,11 +1,11 @@
 :root {
-  --background: #0a121c;
-  --foreground: #e5efe8;
+  --background: #090b18;
+  --foreground: #e5f6ef;
   --muted: #92a4ad;
   --line: #283b46;
-  --cyan: #73dfe5;
-  --magenta: #ee8acb;
-  --accent: #c7efa0;
+  --cyan: #42e8e0;
+  --magenta: #ed5ab2;
+  --accent: #c7ed63;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -37,15 +37,17 @@ h1 { font-size: clamp(46px, 5.7vw, 83px); line-height: .97; letter-spacing: -.05
 h1 > span:not(.title-period) { color: var(--accent); }
 .title-period { color: var(--foreground); }
 .title-description { color: #a5b5ba; font-size: 14px; line-height: 1.85; }
-.title-art { height: 180px; position: relative; overflow: hidden; margin-top: 24px; border-bottom: 1px solid #3b5355; background: linear-gradient(180deg, transparent, #19303965); }
+.title-art { height: 220px; min-height: 220px; position: relative; overflow: hidden; margin-top: 24px; border-bottom: 1px solid #343b58; background: #101529; }
 .city-grid { position: absolute; inset: 0; opacity: .4; background-image: linear-gradient(#35526240 1px, transparent 1px), linear-gradient(90deg, #35526240 1px, transparent 1px); background-size: 26px 26px; mask-image: linear-gradient(transparent, black); }
-.city-block { position: absolute; bottom: 28px; width: 70px; height: 82px; background: repeating-linear-gradient(0deg, transparent 0 18px, #3a60695c 18px 22px), repeating-linear-gradient(90deg, #12222f 0 17px, #223848 17px 22px); border-top: 5px solid #34505e; }
-.city-one { left: 12px; height: 65px; }.city-two { right: 60px; height: 128px; }.city-three { right: -14px; height: 93px; }
-.hero-pair { position: absolute; left: 21%; bottom: 26px; display: flex; gap: 25px; }
-.character-mark { width: 44px; height: 58px; flex-shrink: 0; image-rendering: pixelated; }
-.hero-pair .character-mark { width: 84px; height: 112px; }
-.hero-pair .character-mark + .character-mark { transform: translateY(-10px); }
-.art-caption { position: absolute; bottom: 9px; left: 0; font-size: 8px; letter-spacing: .1em; color: #879ba3; }
+.title-backdrop { position: absolute; inset: 0; background-repeat: repeat-x; background-position: center bottom; image-rendering: pixelated; }
+.title-backdrop.bg_mid { background-position-x: 30%; }
+.title-backdrop.bg_near { background-position-x: 70%; }
+.title-crest { position: absolute; width: 192px; height: 64px; top: 6px; right: 8px; object-fit: contain; image-rendering: pixelated; }
+.hero-pair { position: absolute; left: 12%; bottom: 26px; display: flex; gap: 12px; border-bottom: 4px solid #12aec0; background: linear-gradient(transparent 85%, #101529 85%); }
+.character-mark { width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; image-rendering: pixelated; }
+.full-body { overflow: hidden; }
+.hero-pair .character-mark { width: 96px; height: 144px; }
+.art-caption { position: absolute; bottom: 5px; left: 0; right: 0; padding: 5px 8px; background: #090b18; font-size: 8px; letter-spacing: .1em; color: #aab6cb; }
 .launch-panel { background: #111d27; border: 1px solid var(--line); padding: 30px; box-shadow: 7px 7px 0 #070e16; }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; }
 .tiny-tag { color: #9bb5bb; border: 1px solid var(--line); padding: 4px 6px; font-size: 8px; }
@@ -79,7 +81,7 @@ kbd { display: inline-block; background: #1c2a34; border: 1px solid #3c4e57; bor
 .small-button { padding: 7px 9px; border: 1px solid var(--line); color: #d2e0dd; background: transparent; font-size: 11px; }
 .hud { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
 .player-card { display: flex; gap: 13px; align-items: center; }
-.player-card .character-mark { width: 36px; height: 52px; }
+.player-card .character-mark { width: 48px; height: 48px; }
 .player-details { flex: 1; }
 .player-name { display: flex; justify-content: space-between; align-items: center; font-size: 10px; }.player-name strong { letter-spacing: .07em; }
 meter { display: block; height: 7px; width: 100%; border: none; margin: 7px 0; background: #24343e; border-radius: 0; }
@@ -101,8 +103,8 @@ progress::-webkit-progress-bar { background: #24343e; }progress::-webkit-progres
 .status-pill.live { color: var(--accent); }.status-pill.error, .status-pill.fallback_mock { color: #f3c47b; }
 .directive-pill { color: #d5b5d3; }
 .viewport-frame { width: 100%; aspect-ratio: 16 / 9; position: relative; background: #050b13; border: 1px solid #39515e; box-shadow: 0 10px 45px #0005; }
-.canvas-host { width: 100%; height: 100%; overflow: hidden; }
-canvas { image-rendering: pixelated; display: block; }
+.canvas-host { width: 100%; height: 100%; overflow: hidden; display: grid; place-items: center; }
+.canvas-host canvas { image-rendering: pixelated; display: block; margin: 0 !important; }
 .game-footer { padding: 15px 0; }
 .loading-screen { min-height: 50vh; display: grid; place-items: center; color: var(--accent); font: 13px var(--font-geist-mono), monospace; }
 .revive-prompt { padding: 10px; background: #392c22; color: #ffca8b; font-size: 12px; border: 1px solid #b38454; margin: 12px 0; }
