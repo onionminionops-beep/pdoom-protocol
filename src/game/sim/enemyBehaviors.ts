@@ -3,6 +3,7 @@ import { rngInt } from "./rng";
 import { moveEnemy } from "./enemies";
 import { damagePlayer, playerBox } from "./player";
 import { aabbOverlap } from "./physics";
+import { visibleFrom } from "./visibility";
 import type { EnemyState, PlayerId, PlayerState, ProjectileState, SimEvent, WorldState } from "./types";
 
 /**
@@ -19,7 +20,7 @@ export function nearestLivePlayer(world: WorldState, e: EnemyState): PlayerState
   for (const pid of ["p1", "p2"] as const) {
     if (world.slots[pid] === "DISABLED") continue;
     const p = world.players[pid];
-    if (!p.alive || p.downed) continue;
+    if (!p.alive || p.downed || !visibleFrom(world.level, p.pos, e.pos)) continue;
     const d = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y);
     if (d < bestD) {
       bestD = d;
@@ -343,7 +344,7 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
     events.push({ type: "boss_phase", phase });
     // Phase 3 requires both switches; make them available.
     if (phase === 3) {
-      for (const it of world.interactables) if (it.type === "switch") it.activated = false;
+      for (const it of world.interactables) if (it.type === "switch" && it.roomId === e.roomId) it.activated = false;
     }
   }
   e.data.t = (e.data.t ?? 0) + 1000 / 60;
@@ -353,7 +354,7 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
   e.data.cd = Math.max(0, (e.data.cd ?? 1500) - 1000 / 60);
   const target = nearestLivePlayer(world, e);
   if (phase === 3) {
-    const switches = world.interactables.filter((i) => i.type === "switch");
+    const switches = world.interactables.filter((i) => i.type === "switch" && i.roomId === e.roomId);
     if (switches.length > 0 && switches.every((s) => s.activated)) {
       // Overload: boss becomes vulnerable and stops attacking briefly.
       e.data.overload = (e.data.overload ?? 0) + 1000 / 60;

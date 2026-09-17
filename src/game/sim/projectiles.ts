@@ -3,11 +3,17 @@ import { circleAABBOverlap, isSolidAt } from "./physics";
 import { damagePlayer, playerBox } from "./player";
 import { damageEnemy, enemyBox } from "./enemies";
 import type { PlayerId, SimEvent, WorldState } from "./types";
+import { roomAt, visibleFrom } from "./visibility";
 
 export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
   const dt = TICK_MS / 1000;
   const remaining = [];
   for (const pr of world.projectiles) {
+    const source = pr.ownerKind === "enemy" ? world.enemies.find((e) => e.id === pr.ownerId) : undefined;
+    if (pr.ownerKind === "enemy" && (!source || roomAt(world.level, pr.pos)?.id !== source.roomId)) {
+      events.push({ type: "projectile_expired", projectileId: pr.id, pos: { ...pr.pos } });
+      continue;
+    }
     pr.ageMs += TICK_MS;
     const dx = pr.vel.x * dt;
     const dy = pr.vel.y * dt;
@@ -38,7 +44,8 @@ export function stepProjectiles(world: WorldState, events: SimEvent[]): void {
     } else if (!dead && pr.ownerKind === "enemy") {
       for (const pid of ["p1", "p2"] as const) {
         const p = world.players[pid];
-        if (world.slots[pid] === "DISABLED" || !p.alive || p.downed) continue;
+        if (world.slots[pid] === "DISABLED" || !p.alive || p.downed ||
+          !source || !visibleFrom(world.level, p.pos, source.pos)) continue;
         if (circleAABBOverlap(pr.pos.x, pr.pos.y, pr.radius, playerBox(p))) {
           damagePlayer(p, pr.damage, pr.ownerId, pr.vel.x > 0 ? "right" : "left", events);
           events.push({ type: "projectile_hit", projectileId: pr.id, targetId: pid, pos: { ...pr.pos }, damage: pr.damage });

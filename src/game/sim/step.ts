@@ -2,14 +2,14 @@ import { MOVEMENT, TICK_MS, TILE } from "../config/movement";
 import { FACT_CHECK_PULSE, WEAPONS } from "../config/weapons";
 import { neutralInput, type PlayerInputV1 } from "../contracts/input";
 import { aabbOverlap } from "./physics";
-import { detectLanding, otherPlayerId, playerBox, stepPlayer, tryFactCheckPulse, tryShoot } from "./player";
+import { damagePlayer, detectLanding, otherPlayerId, playerBox, stepPlayer, tryFactCheckPulse, tryShoot } from "./player";
 import { stepEnemies } from "./enemies";
 import { applyPulse, stepProjectiles } from "./projectiles";
 import type { PlayerId, PlayerInputs, SimEvent, WorldState } from "./types";
 
-export const REVIVE_HOLD_MS = 1500;
-export const REVIVE_RANGE_PX = 40;
-export const INTERACT_RANGE_PX = 36;
+export const REVIVE_HOLD_MS = MOVEMENT.reviveHoldMs;
+export const REVIVE_RANGE_PX = MOVEMENT.reviveRangePx;
+export const INTERACT_RANGE_PX = MOVEMENT.interactRangePx;
 export const REVIVE_BONUS = 300;
 export const TIME_BONUS_PAR_MS = 8 * 60 * 1000;
 
@@ -93,9 +93,9 @@ function handleRevives(world: WorldState, inputs: PlayerInputs, events: SimEvent
       p.reviveProgressMs += TICK_MS;
       other.anim = "being_revived";
       events.push({ type: "revive_progress", playerId: pid, target: oid, fraction: Math.min(1, p.reviveProgressMs / REVIVE_HOLD_MS) });
-      if (p.reviveProgressMs >= REVIVE_HOLD_MS) {
+      if (p.reviveProgressMs + 1e-6 >= REVIVE_HOLD_MS) {
         other.downed = false;
-        other.health = Math.round(MOVEMENT.maxHealth * 0.5);
+        other.health = Math.round(MOVEMENT.maxHealth * MOVEMENT.reviveHealthFraction);
         other.invulnMs = MOVEMENT.invulnerabilityAfterHitMs * 2;
         other.downedTimerMs = 0;
         p.reviveProgressMs = 0;
@@ -186,21 +186,16 @@ function stepZonesAndHazards(world: WorldState, events: SimEvent[]): void {
     if (!p.alive || p.downed) continue;
     // Falling out of the world / hazards
     const feetY = p.pos.y + MOVEMENT.bodyHeight / 2;
-    const tx = Math.floor(p.pos.x / TILE);
-    const ty = Math.floor((feetY - 1) / TILE);
+    const tx0 = Math.floor((p.pos.x - MOVEMENT.bodyWidth / 2 + 0.01) / TILE);
+    const tx1 = Math.floor((p.pos.x + MOVEMENT.bodyWidth / 2 - 0.01) / TILE);
+    const ty = Math.floor((feetY + 1) / TILE);
     const row = world.level.rows[ty];
-    const hazard = row !== undefined && row[tx] === "H";
-    if (hazard || p.pos.y > world.level.heightTiles * TILE + 64) {
-      p.health = 0;
-      p.downed = true;
-      p.downedTimerMs = 20000;
-      p.damageTaken += 100;
-      // Pull the body back onto the last safe ground so a teammate can revive.
-      p.pos.y = Math.min(p.pos.y, (ty - 1) * TILE + TILE - MOVEMENT.bodyHeight / 2);
-      p.vel = { x: 0, y: 0 };
-      events.push({ type: "player_hurt", playerId: pid, damage: 100, from: "hazard" });
-      events.push({ type: "player_downed", playerId: pid });
-      continue;
+    const hazard = row !== undefined && row.slice(tx0, tx1 + 1).includes("H");
+    if (hazard) {
+      damagePlayer(p, 25, "hazard", null, events);
+    }
+    if (p.pos.y > world.level.heightTiles * TILE + 64) {
+      damagePlayer(p, MOVEMENT.maxHealth, "fall", null, events);
     }
     for (const z of world.restrictedZones) {
       if (aabbOverlap({ x: z.x + z.w / 2, y: z.y + z.h / 2, w: z.w, h: z.h }, playerBox(p))) {
@@ -228,7 +223,7 @@ function updateRooms(world: WorldState, events: SimEvent[]): void {
     }
     if (room.gateOnEnemies && !world.openedGates[room.id]) {
       const remaining = world.enemies.some((e) => e.roomId === room.id && e.health > 0);
-      if (!remaining && world.enemies.length >= 0 && world.tick > 1) {
+      if (!remaining && world.tick > 1) {
         // Only open once the room has been entered (avoid opening before spawn logic).
         if (world.currentRoomId === room.id || roomIndex(world, room.id) < roomIndex(world, world.currentRoomId)) {
           world.openedGates[room.id] = true;
@@ -256,7 +251,7 @@ function roomIndex(world: WorldState, id: string): number {
 /** A closed gate is solid for players; exposed so physics/level can consult it. */
 export function isGateClosedAt(world: WorldState, tileX: number): boolean {
   for (const room of world.level.rooms) {
-    if (room.gateTileX === tileX && room.gateOnEnemies && !world.openedGates[room.id]) return true;
+    if (room.gateTileX === tileX && !world.openedGates[room.id]) return true;
   }
   return false;
 }
