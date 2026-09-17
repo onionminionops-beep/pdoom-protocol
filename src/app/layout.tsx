@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "USER + JEV: P(DOOM) PROTOCOL",
-  description: "Co-op 2D platform shooter where a human and TypeSafe Jev play together with identical controls.",
+  description:
+    "Co-op 2D platform shooter where a human and TypeSafe Jev play together with identical controls.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

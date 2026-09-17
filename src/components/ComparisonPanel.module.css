@@ -1,0 +1,43 @@
+.panel {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: 1px solid #294249;
+  background: #0a161b;
+  color: #dbe6e8;
+}
+.panel h3 {
+  color: #9ee1cc;
+}
+.panel p {
+  max-width: 75ch;
+  line-height: 1.6;
+  font-size: 0.85rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.table {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+.table table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  width: 100%;
+}
+.table caption {
+  text-align: left;
+  padding: 0.75rem 0;
+}
+.table th,
+.table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid #294249;
+  text-align: left;
+  white-space: nowrap;
+}
+.table thead {
+  color: #9ee1cc;
+}

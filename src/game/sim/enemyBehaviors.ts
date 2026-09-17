@@ -3,7 +3,15 @@ import { rngInt } from "./rng";
 import { moveEnemy } from "./enemies";
 import { damagePlayer, playerBox } from "./player";
 import { aabbOverlap } from "./physics";
-import type { EnemyState, PlayerId, PlayerState, ProjectileState, SimEvent, WorldState } from "./types";
+import { visibleFrom } from "./visibility";
+import type {
+  EnemyState,
+  PlayerId,
+  PlayerState,
+  ProjectileState,
+  SimEvent,
+  WorldState,
+} from "./types";
 
 /**
  * Deterministic enemy behaviours. Enemies MAY target players (they are the
@@ -19,7 +27,7 @@ export function nearestLivePlayer(world: WorldState, e: EnemyState): PlayerState
   for (const pid of ["p1", "p2"] as const) {
     if (world.slots[pid] === "DISABLED") continue;
     const p = world.players[pid];
-    if (!p.alive || p.downed) continue;
+    if (!p.alive || p.downed || !visibleFrom(world.level, p.pos, e.pos)) continue;
     const d = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y);
     if (d < bestD) {
       bestD = d;
@@ -118,7 +126,12 @@ function stepDoomProphet(world: WorldState, e: EnemyState, events: SimEvent[]): 
 }
 
 /** Ranged attacker: telegraph, then throw a graph-shaped projectile. */
-function stepRanged(world: WorldState, e: EnemyState, events: SimEvent[], kind: ProjectileState["weapon"]): void {
+function stepRanged(
+  world: WorldState,
+  e: EnemyState,
+  events: SimEvent[],
+  kind: ProjectileState["weapon"],
+): void {
   const def = ENEMY_DEFS[e.type];
   const R = def.ranged!;
   const target = nearestLivePlayer(world, e);
@@ -151,7 +164,15 @@ function stepRanged(world: WorldState, e: EnemyState, events: SimEvent[], kind: 
       e.phaseMs = 0;
       const dir = e.facing === "right" ? 1 : -1;
       const lob = kind === "enemy_graph" ? -120 : 0;
-      fireEnemyProjectile(world, e, kind, { x: dir * R.speed, y: lob }, R.damage, 6, R.rangePx + 80);
+      fireEnemyProjectile(
+        world,
+        e,
+        kind,
+        { x: dir * R.speed, y: lob },
+        R.damage,
+        6,
+        R.rangePx + 80,
+      );
       events.push({ type: "enemy_attack", enemyId: e.id, pos: { ...e.pos } });
       e.data.cd = R.cooldownMs;
     }
@@ -205,7 +226,14 @@ function stepHallMonitor(world: WorldState, e: EnemyState, events: SimEvent[]): 
     e.data.mark = (e.data.mark ?? 0) - 1000 / 60;
     if (e.data.mark <= 0) {
       e.data.mark = 4500;
-      world.restrictedZones.push({ x: e.pos.x - 48, y: e.pos.y, w: 96, h: 80, msLeft: 2500, ownerId: e.id });
+      world.restrictedZones.push({
+        x: e.pos.x - 48,
+        y: e.pos.y,
+        w: 96,
+        h: 80,
+        msLeft: 2500,
+        ownerId: e.id,
+      });
       e.phase = "attack";
       e.phaseMs = 0;
       events.push({ type: "enemy_attack", enemyId: e.id, pos: { ...e.pos } });
@@ -343,7 +371,8 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
     events.push({ type: "boss_phase", phase });
     // Phase 3 requires both switches; make them available.
     if (phase === 3) {
-      for (const it of world.interactables) if (it.type === "switch") it.activated = false;
+      for (const it of world.interactables)
+        if (it.type === "switch" && it.roomId === e.roomId) it.activated = false;
     }
   }
   e.data.t = (e.data.t ?? 0) + 1000 / 60;
@@ -353,7 +382,9 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
   e.data.cd = Math.max(0, (e.data.cd ?? 1500) - 1000 / 60);
   const target = nearestLivePlayer(world, e);
   if (phase === 3) {
-    const switches = world.interactables.filter((i) => i.type === "switch");
+    const switches = world.interactables.filter(
+      (i) => i.type === "switch" && i.roomId === e.roomId,
+    );
     if (switches.length > 0 && switches.every((s) => s.activated)) {
       // Overload: boss becomes vulnerable and stops attacking briefly.
       e.data.overload = (e.data.overload ?? 0) + 1000 / 60;
@@ -384,12 +415,32 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
       // Doomer predictions: falling charts from above at 3 x positions around target.
       for (let i = -1; i <= 1; i++) {
         const x = (target?.pos.x ?? e.pos.x) + i * 90 + (r.value - 1) * 20;
-        world.projectiles.push(mkBossProj(world, e.id, { x, y: e.pos.y - 100 }, { x: 0, y: R.speed }, R.damage, "enemy_graph", 0));
+        world.projectiles.push(
+          mkBossProj(
+            world,
+            e.id,
+            { x, y: e.pos.y - 100 },
+            { x: 0, y: R.speed },
+            R.damage,
+            "enemy_graph",
+            0,
+          ),
+        );
       }
     } else if (phase === 2) {
       // Purity-test attacks: horizontal sweeps left and right + contradictory slogans.
       for (const dir of [-1, 1]) {
-        world.projectiles.push(mkBossProj(world, e.id, { x: e.pos.x + dir * 70, y: e.pos.y + 30 + r.value * 15 }, { x: dir * R.speed, y: 0 }, R.damage, "enemy_boss", 1));
+        world.projectiles.push(
+          mkBossProj(
+            world,
+            e.id,
+            { x: e.pos.x + dir * 70, y: e.pos.y + 30 + r.value * 15 },
+            { x: dir * R.speed, y: 0 },
+            R.damage,
+            "enemy_boss",
+            1,
+          ),
+        );
       }
       e.bubble = r.value === 0 ? "APOLOGIZE." : r.value === 1 ? "NEVER APOLOGIZE." : "BOTH.";
       e.bubbleMs = 1200;
@@ -397,7 +448,17 @@ function stepBoss(world: WorldState, e: EnemyState, events: SimEvent[]): void {
       // Algorithmic overload: radial burst.
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2 + r.value * 0.3;
-        world.projectiles.push(mkBossProj(world, e.id, { ...e.pos }, { x: Math.cos(a) * R.speed * 0.8, y: Math.sin(a) * R.speed * 0.8 }, R.damage, "enemy_boss", 2));
+        world.projectiles.push(
+          mkBossProj(
+            world,
+            e.id,
+            { ...e.pos },
+            { x: Math.cos(a) * R.speed * 0.8, y: Math.sin(a) * R.speed * 0.8 },
+            R.damage,
+            "enemy_boss",
+            2,
+          ),
+        );
       }
     }
   }

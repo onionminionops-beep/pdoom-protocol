@@ -5,7 +5,10 @@ import { JevController, type JevControllerOptions } from "./jev";
 import { MockAIController } from "./mock";
 import type { PlayerController } from "./types";
 
-export function createController(kind: SlotKind, jevOptions?: JevControllerOptions): PlayerController {
+export function createController(
+  kind: SlotKind,
+  jevOptions?: JevControllerOptions,
+): PlayerController {
   switch (kind) {
     case "HUMAN":
       return new HumanController();

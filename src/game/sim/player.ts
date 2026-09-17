@@ -2,7 +2,15 @@ import { MOVEMENT, TICK_MS } from "../config/movement";
 import { WEAPONS, FACT_CHECK_PULSE } from "../config/weapons";
 import type { PlayerInputV1 } from "../contracts/input";
 import { groundBelow, moveAABB } from "./physics";
-import type { AABB, Facing, PlayerId, PlayerState, ProjectileState, SimEvent, WorldState } from "./types";
+import type {
+  AABB,
+  Facing,
+  PlayerId,
+  PlayerState,
+  ProjectileState,
+  SimEvent,
+  WorldState,
+} from "./types";
 
 export function playerBox(p: PlayerState): AABB {
   return { x: p.pos.x, y: p.pos.y, w: MOVEMENT.bodyWidth, h: MOVEMENT.bodyHeight };
@@ -23,11 +31,16 @@ function setAnim(p: PlayerState, anim: PlayerState["anim"]): void {
  * Advances one player by one tick given its input. Facing changes ONLY when
  * `input.horizontal` is left/right. Nothing in here reads enemy positions.
  */
-export function stepPlayer(world: WorldState, p: PlayerState, input: PlayerInputV1, events: SimEvent[]): void {
+export function stepPlayer(
+  world: WorldState,
+  p: PlayerState,
+  input: PlayerInputV1,
+  events: SimEvent[],
+): void {
   const dt = TICK_MS / 1000;
   const M = MOVEMENT;
   p.animMs += TICK_MS;
-  p.lastInput = input;
+  p.lastInput = { ...input };
 
   // timers
   p.fireCooldownMs = Math.max(0, p.fireCooldownMs - TICK_MS);
@@ -102,19 +115,21 @@ export function stepPlayer(world: WorldState, p: PlayerState, input: PlayerInput
   const jumpPressed = input.verticalAction === "jump";
   if (jumpPressed && !p.jumpHeld) p.jumpBufferMs = M.jumpBufferMs;
   if (jumpPressed) p.jumpHeldMs += TICK_MS;
-  else p.jumpHeldMs = 0;
+  else if (!p.jumping) p.jumpHeldMs = 0;
   p.jumpHeld = jumpPressed;
 
   const canJumpNow = p.grounded || p.coyoteMs > 0;
   if (p.jumpBufferMs > 0 && canJumpNow) {
     p.vel.y = M.jumpVelocity;
     p.jumping = true;
+    p.jumpHeldMs = 0;
     p.grounded = false;
     p.coyoteMs = 0;
     p.jumpBufferMs = 0;
     events.push({ type: "jump", playerId: p.id });
   }
-  if (p.jumping && !jumpPressed && p.vel.y < M.jumpCutVelocity && p.jumpHeldMs >= 0) {
+  if (p.jumping && !jumpPressed) p.jumpHeldMs += TICK_MS;
+  if (p.jumping && !jumpPressed && p.vel.y < M.jumpCutVelocity && p.jumpHeldMs >= M.jumpMinHoldMs) {
     p.vel.y = M.jumpCutVelocity;
     p.jumping = false;
   }
@@ -145,7 +160,12 @@ export function stepPlayer(world: WorldState, p: PlayerState, input: PlayerInput
   if (p.reviveProgressMs > 0) setAnim(p, "revive");
 }
 
-function applyGravityAndMove(world: WorldState, p: PlayerState, dt: number, ignoreOneWay: boolean): void {
+function applyGravityAndMove(
+  world: WorldState,
+  p: PlayerState,
+  dt: number,
+  ignoreOneWay: boolean,
+): void {
   const M = MOVEMENT;
   p.vel.y = Math.min(M.maxFallSpeed, p.vel.y + M.gravity * dt);
   const res = moveAABB(world.level, playerBox(p), p.vel, dt, ignoreOneWay);
@@ -183,7 +203,12 @@ export function detectLanding(p: PlayerState, prevVy: number, events: SimEvent[]
  * Fires the current weapon if legal. Projectiles travel horizontally in
  * `p.facing`; the only vertical component is the weapon's fixed pellet spread.
  */
-export function tryShoot(world: WorldState, p: PlayerState, input: PlayerInputV1, events: SimEvent[]): void {
+export function tryShoot(
+  world: WorldState,
+  p: PlayerState,
+  input: PlayerInputV1,
+  events: SimEvent[],
+): void {
   if (!input.shoot || !p.alive) return;
   if (p.downed) {
     events.push({ type: "shot_blocked", playerId: p.id, reason: "downed" });
@@ -232,14 +257,26 @@ export function tryShoot(world: WorldState, p: PlayerState, input: PlayerInputV1
   events.push({ type: "shot", playerId: p.id, weapon: def.id, facing: p.facing, pos: muzzle });
 }
 
-export function tryFactCheckPulse(world: WorldState, p: PlayerState, input: PlayerInputV1, events: SimEvent[]): boolean {
-  if (!input.interact || p.factCheckMs <= 0 || p.factCheckCooldownMs > 0 || p.downed || !p.alive) return false;
+export function tryFactCheckPulse(
+  world: WorldState,
+  p: PlayerState,
+  input: PlayerInputV1,
+  events: SimEvent[],
+): boolean {
+  if (!input.interact || p.factCheckMs <= 0 || p.factCheckCooldownMs > 0 || p.downed || !p.alive)
+    return false;
   p.factCheckCooldownMs = FACT_CHECK_PULSE.cooldownMs;
   events.push({ type: "fact_check_pulse", playerId: p.id, pos: { ...p.pos } });
   return true;
 }
 
-export function damagePlayer(p: PlayerState, amount: number, from: string, knockDir: Facing | null, events: SimEvent[]): void {
+export function damagePlayer(
+  p: PlayerState,
+  amount: number,
+  from: string,
+  knockDir: Facing | null,
+  events: SimEvent[],
+): void {
   if (!p.alive || p.downed || p.invulnMs > 0 || p.dashTimeMs > 0) return;
   p.health = Math.max(0, p.health - amount);
   p.damageTaken += amount;
