@@ -38,7 +38,7 @@ export type BackdropKey = "bg_far" | "bg_mid" | "bg_near";
 
 export interface ArtManifest {
   version: 1;
-  generatedBy: "gpt-image-2" | "programmatic" | "mixed";
+  generatedBy: "gpt-image-2" | "gpt-image-1" | "programmatic" | "mixed";
   characters: Record<CharacterSheetKey, SpriteSheetDef>;
   enemies: Record<EnemySheetKey, SpriteSheetDef>;
   props: Record<PropSheetKey, SpriteSheetDef>;
