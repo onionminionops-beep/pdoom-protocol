@@ -242,10 +242,17 @@ export class JevController implements PlayerController {
       this.inputAcceptedAt = received;
       this.lastDecision = { ...result, observation };
       this.fallback = false;
-      this.nextRequestAt = Math.max(
-        this.nextRequestAt,
-        started + Math.max(result.input.holdForMs, latency * 1.2),
-      );
+      this.nextRequestAt =
+        result.input.verticalAction === "jump"
+          ? Math.max(
+              this.nextRequestAt,
+              received +
+                Math.max(
+                  AI_CONFIG.minIntervalMs,
+                  session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs,
+                ),
+            )
+          : Math.max(this.nextRequestAt, started + Math.max(result.input.holdForMs, latency * 1.2));
       this.publish({
         mode: "live",
         lastLatencyMs: result.latencyMs,
@@ -285,10 +292,16 @@ export class JevController implements PlayerController {
     if (
       this.input &&
       now - this.inputObservedAt <= AI_CONFIG.maxResponseAgeMs &&
-      now - this.inputAcceptedAt < Math.min(AI_CONFIG.staleMs, this.input.holdForMs) &&
       ctx.tick - this.input.basedOnTick <= AI_CONFIG.maxTickAgeTicks
     )
-      return { ...this.input };
+      if (
+        now - this.inputAcceptedAt < Math.min(AI_CONFIG.staleMs, this.input.holdForMs) ||
+        (this.inFlight &&
+          this.input.verticalAction === "jump" &&
+          ctx.world.players[ctx.playerId].jumpHeld &&
+          now - this.inputAcceptedAt < AI_CONFIG.staleMs)
+      )
+        return { ...this.input };
     return neutralInput(ctx.episodeId, ctx.tick);
   }
 
