@@ -10,12 +10,12 @@ export const AI_CONFIG = {
   consecutiveFailuresBeforeMock: 4,
   retryLiveAfterMs: 15000,
   confidenceThresholds: {
-    horizontal: 0.4,
-    vertical: 0.45,
+    horizontal: 0.2,
+    vertical: 0.2,
     shoot: 0.5,
     dash: 0.55,
     interact: 0.5,
-    duration: 0.4,
+    duration: 0.1,
   },
 } as const;
 

@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { AI_CONFIG } from "@/game/config/ai";
+import { MOVEMENT, TICK_MS } from "@/game/config/movement";
 import { DIRECTIVES, type DirectiveId } from "@/game/contracts/directives";
-import { PlayerInputV1Schema } from "@/game/contracts/input";
+import { PlayerInputV1Schema, neutralInput } from "@/game/contracts/input";
 import { serializeObservation } from "@/game/contracts/observation";
 import { CONSENSUS_HEIGHTS } from "@/game/levels/consensusHeights";
 import { buildObservation } from "@/game/observation/build";
 import { createWorld } from "@/game/sim/world";
+import { stepWorld } from "@/game/sim/step";
 import { buildQuestions, convertDecision, requestDecision } from "@/server/jev/typesafe";
 
 vi.mock("server-only", () => ({}));
@@ -105,6 +107,65 @@ describe("TypeSafe decisions", () => {
     });
     expect(Object.values(result.gated)).toEqual([true, true, true, true, true]);
     expect(result.answers.shoot_input.choice).toBe("true");
+  });
+
+  it.each([
+    { confidence: 0.26, probabilities: { jump: 0.51, none: 0.48, drop: 0.01 } },
+    { confidence: 0.25, probabilities: { jump: 0.5, none: 0.49, drop: 0.01 } },
+    { confidence: 0.27, probabilities: { jump: 0.51, none: 0.48, drop: 0.01 } },
+  ])("lets a captured jump decision clear the tutorial step ($confidence)", (vertical) => {
+    const world = createWorld({
+      level: CONSENSUS_HEIGHTS,
+      seed: 42,
+      episodeId: "ep-test",
+      directive: "SPEEDRUNNER",
+      slots: { p1: "DISABLED", p2: "JEV" },
+    });
+    for (let tick = 0; tick < 120; tick++) {
+      stepWorld(world, {
+        p1: neutralInput(world.episodeId, world.tick),
+        p2: { ...neutralInput(world.episodeId, world.tick), horizontal: "right" },
+      });
+    }
+    const before = buildObservation(world, "p2", world.elapsedMs);
+    expect(before.self.position.x).toBeCloseTo(373.99);
+    expect(before.self.canJump).toBe(true);
+    const raw = upstream();
+    raw.answers.horizontal_input = {
+      type: "choice",
+      choice: "right",
+      confidence: 0.33,
+      probabilities: { left: 0.09, neutral: 0.36, right: 0.55 },
+    };
+    raw.answers.vertical_action = { type: "choice", choice: "jump", ...vertical };
+    raw.answers.dash_input.choice = "false";
+    raw.answers.dash_input.probabilities = { true: 0.05, false: 0.95 };
+    raw.answers.input_duration = {
+      type: "choice",
+      choice: "250",
+      confidence: 0.26,
+      probabilities: { "100": 0.14, "150": 0.15, "200": 0.27, "250": 0.44 },
+    };
+    const decision = convertDecision(raw, before, 150);
+    expect(decision.input).toMatchObject({
+      horizontal: "right",
+      verticalAction: "jump",
+      holdForMs: 250,
+    });
+    expect(decision.gated).toMatchObject({ horizontal: false, vertical: false });
+    expect(decision.answers.vertical_action.confidence).toBe(vertical.confidence);
+    for (let tick = 0; tick < 60; tick++) {
+      stepWorld(world, {
+        p1: neutralInput(world.episodeId, world.tick),
+        p2:
+          tick * TICK_MS < decision.input.holdForMs
+            ? decision.input
+            : neutralInput(world.episodeId, world.tick),
+      });
+    }
+    expect(world.players.p2.pos.x).toBeGreaterThan(384);
+    expect(world.players.p2.pos.y + MOVEMENT.bodyHeight / 2).toBeCloseTo(447.99);
+    expect(world.players.p2.grounded).toBe(true);
   });
 
   it("uses independent thresholds, including the equality boundary", () => {
