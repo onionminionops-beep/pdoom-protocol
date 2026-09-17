@@ -18,7 +18,11 @@ function bridgeFixture() {
   const bridge = new HumanInputBridge(controller, bindings);
   disposables.push(bridge, controller);
   const world = createEpisode(options);
-  return { bridge, read: () => controller.update({ world, playerId: "p1", tick: 0, episodeId: world.episodeId, nowMs: 0 }) };
+  return {
+    bridge,
+    read: () =>
+      controller.update({ world, playerId: "p1", tick: 0, episodeId: world.episodeId, nowMs: 0 }),
+  };
 }
 
 describe("human input isolation", () => {

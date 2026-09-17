@@ -7,11 +7,23 @@ import type { SimEvent } from "@/game/sim/types";
 const EVENTS = {
   shot: { type: "shot", playerId: "p1", weapon: "blaster", facing: "right", pos: { x: 500, y: 0 } },
   shot_blocked: { type: "shot_blocked", playerId: "p1", reason: "no_ammo" },
-  projectile_hit: { type: "projectile_hit", projectileId: "b", targetId: "e", pos: { x: 0, y: 0 }, damage: 10 },
+  projectile_hit: {
+    type: "projectile_hit",
+    projectileId: "b",
+    targetId: "e",
+    pos: { x: 0, y: 0 },
+    damage: 10,
+  },
   projectile_expired: { type: "projectile_expired", projectileId: "b", pos: { x: 0, y: 0 } },
   explosion: { type: "explosion", pos: { x: 0, y: 0 }, radius: 60 },
   enemy_hurt: { type: "enemy_hurt", enemyId: "e", damage: 10 },
-  enemy_killed: { type: "enemy_killed", enemyId: "e", enemyType: "doom_prophet", pos: { x: 0, y: 0 }, score: 100 },
+  enemy_killed: {
+    type: "enemy_killed",
+    enemyId: "e",
+    enemyType: "doom_prophet",
+    pos: { x: 0, y: 0 },
+    score: 100,
+  },
   player_hurt: { type: "player_hurt", playerId: "p1", damage: 10, from: "e" },
   player_downed: { type: "player_downed", playerId: "p1" },
   player_died: { type: "player_died", playerId: "p1" },
@@ -35,27 +47,46 @@ const EVENTS = {
 
 function mockContext() {
   const parameter = () => ({
-    setValueAtTime: vi.fn(), setTargetAtTime: vi.fn(),
-    linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(),
+    setValueAtTime: vi.fn(),
+    setTargetAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
+    exponentialRampToValueAtTime: vi.fn(),
   });
   const node = () => ({ connect: vi.fn(), disconnect: vi.fn() });
-  const source = () => ({ ...node(), start: vi.fn(), stop: vi.fn(), onended: null as (() => void) | null });
+  const source = () => ({
+    ...node(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    onended: null as (() => void) | null,
+  });
   const context = {
-    currentTime: 10, sampleRate: 44100, state: "suspended", destination: node(),
+    currentTime: 10,
+    sampleRate: 44100,
+    state: "suspended",
+    destination: node(),
     createGain: vi.fn(() => ({ ...node(), gain: parameter() })),
     createStereoPanner: vi.fn(() => ({ ...node(), pan: parameter() })),
     createOscillator: vi.fn(() => ({ ...source(), type: "sine", frequency: parameter() })),
     createBufferSource: vi.fn(() => ({ ...source(), buffer: null, loop: false })),
     createBiquadFilter: vi.fn(() => ({ ...node(), type: "lowpass", frequency: parameter() })),
-    createBuffer: vi.fn((_channels: number, size: number) => ({ getChannelData: () => new Float32Array(size) })),
-    resume: vi.fn(async () => { context.state = "running"; }),
-    close: vi.fn(async () => { context.state = "closed"; }),
+    createBuffer: vi.fn((_channels: number, size: number) => ({
+      getChannelData: () => new Float32Array(size),
+    })),
+    resume: vi.fn(async () => {
+      context.state = "running";
+    }),
+    close: vi.fn(async () => {
+      context.state = "closed";
+    }),
   };
   const factory = vi.fn(() => context as unknown as AudioContext);
   return { context, factory };
 }
 
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("audio engine", () => {
   it("is inert during SSR, before a gesture, and after disposal", async () => {
@@ -83,15 +114,21 @@ describe("audio engine", () => {
     const engine = createAudioEngine({ createContext: factory });
     await engine.unlock();
     expect(() => engine.handleEvents([event], 0)).not.toThrow();
-    const count = context.createOscillator.mock.calls.length + context.createBufferSource.mock.calls.length;
+    const count =
+      context.createOscillator.mock.calls.length + context.createBufferSource.mock.calls.length;
     expect(count > 0).toBe(soundForEvent(event) !== null);
     engine.dispose();
   });
 
   it("distinguishes all weapons and quiet bookkeeping events", () => {
-    expect(["blaster", "shotgun", "launcher"].map((weapon) => soundForEvent({
-      ...EVENTS.shot, weapon: weapon as "blaster" | "shotgun" | "launcher",
-    }))).toEqual(["blaster", "shotgun", "launcher"]);
+    expect(
+      ["blaster", "shotgun", "launcher"].map((weapon) =>
+        soundForEvent({
+          ...EVENTS.shot,
+          weapon: weapon as "blaster" | "shotgun" | "launcher",
+        }),
+      ),
+    ).toEqual(["blaster", "shotgun", "launcher"]);
     expect(soundForEvent({ ...EVENTS.shot_blocked, reason: "cooldown" })).toBeNull();
     expect(soundForEvent(EVENTS.projectile_expired)).toBeNull();
     expect(soundForEvent(EVENTS.revive_progress)).toBeNull();
@@ -104,12 +141,18 @@ describe("audio engine", () => {
     const engine = createAudioEngine({ createContext: factory });
     await engine.unlock();
     engine.handleEvents([EVENTS.shot], 0);
-    expect(context.createStereoPanner.mock.results[0].value.pan.setValueAtTime).toHaveBeenCalledWith(1, 10);
+    expect(
+      context.createStereoPanner.mock.results[0].value.pan.setValueAtTime,
+    ).toHaveBeenCalledWith(1, 10);
     context.currentTime++;
     engine.handleEvents([EVENTS.shot], 1000);
-    expect(context.createStereoPanner.mock.results[1].value.pan.setValueAtTime).toHaveBeenCalledWith(-1, 11);
+    expect(
+      context.createStereoPanner.mock.results[1].value.pan.setValueAtTime,
+    ).toHaveBeenCalledWith(-1, 11);
     engine.handleEvents([EVENTS.jump], 1000);
-    expect(context.createStereoPanner.mock.results[2].value.pan.setValueAtTime).toHaveBeenCalledWith(0, 11);
+    expect(
+      context.createStereoPanner.mock.results[2].value.pan.setValueAtTime,
+    ).toHaveBeenCalledWith(0, 11);
     engine.dispose();
   });
 
@@ -117,20 +160,30 @@ describe("audio engine", () => {
     const { context, factory } = mockContext();
     const engine = createAudioEngine({ createContext: factory });
     await engine.unlock();
-    engine.handleEvents([
-      { ...EVENTS.shot, pos: { x: -480, y: 0 } },
-      { ...EVENTS.shot, playerId: "p2", pos: { x: 480, y: 0 } },
-    ], 0);
+    engine.handleEvents(
+      [
+        { ...EVENTS.shot, pos: { x: -480, y: 0 } },
+        { ...EVENTS.shot, playerId: "p2", pos: { x: 480, y: 0 } },
+      ],
+      0,
+    );
     expect(context.createOscillator).toHaveBeenCalledTimes(2);
-    expect(context.createStereoPanner.mock.results[0].value.pan.setValueAtTime).toHaveBeenCalledWith(-1, 10);
-    expect(context.createStereoPanner.mock.results[1].value.pan.setValueAtTime).toHaveBeenCalledWith(1, 10);
+    expect(
+      context.createStereoPanner.mock.results[0].value.pan.setValueAtTime,
+    ).toHaveBeenCalledWith(-1, 10);
+    expect(
+      context.createStereoPanner.mock.results[1].value.pan.setValueAtTime,
+    ).toHaveBeenCalledWith(1, 10);
     engine.dispose();
   });
 
   it("remembers volume before unlock, clamps invalid values, restores mute", async () => {
     const { context, factory } = mockContext();
     const engine = createAudioEngine({ createContext: factory });
-    engine.setMasterVolume(0.25); engine.setMusicVolume(5); engine.setSfxVolume(NaN); engine.setMuted(true);
+    engine.setMasterVolume(0.25);
+    engine.setMusicVolume(5);
+    engine.setSfxVolume(NaN);
+    engine.setMuted(true);
     await engine.unlock();
     const [master, music, sfx] = context.createGain.mock.results.map((r) => r.value.gain);
     expect(master.setTargetAtTime).toHaveBeenLastCalledWith(0, 10, 0.015);
@@ -173,7 +226,9 @@ describe("audio engine", () => {
     const count = context.createOscillator.mock.calls.length;
     vi.advanceTimersByTime(1000);
     expect(context.createOscillator.mock.calls.length).toBe(count);
-    expect(context.createOscillator.mock.results.every((r) => r.value.disconnect.mock.calls.length > 0)).toBe(true);
+    expect(
+      context.createOscillator.mock.results.every((r) => r.value.disconnect.mock.calls.length > 0),
+    ).toBe(true);
     engine.dispose();
   });
 

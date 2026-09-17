@@ -4,13 +4,15 @@ import { z } from "zod";
 import { JevApiError } from "./errors";
 import type { JevConfig } from "./config";
 
-const SessionClaimsSchema = z.object({
-  v: z.literal(1),
-  id: z.uuid(),
-  episodeId: z.string().min(1).max(64),
-  expiresAt: z.number().int().positive(),
-  budget: z.number().int().positive(),
-}).strict();
+const SessionClaimsSchema = z
+  .object({
+    v: z.literal(1),
+    id: z.uuid(),
+    episodeId: z.string().min(1).max(64),
+    expiresAt: z.number().int().positive(),
+    budget: z.number().int().positive(),
+  })
+  .strict();
 
 export type SessionClaims = z.infer<typeof SessionClaimsSchema>;
 
@@ -35,9 +37,15 @@ export function verifySession(token: string, secret: string, now = Date.now()): 
     const [payload, signature] = parts;
     const expected = createHmac("sha256", secret).update(payload).digest();
     const received = Buffer.from(signature, "base64url");
-    if (received.toString("base64url") !== signature ||
-        received.length !== expected.length || !timingSafeEqual(received, expected)) throw new Error();
-    const claims = SessionClaimsSchema.parse(JSON.parse(Buffer.from(payload, "base64url").toString("utf8")));
+    if (
+      received.toString("base64url") !== signature ||
+      received.length !== expected.length ||
+      !timingSafeEqual(received, expected)
+    )
+      throw new Error();
+    const claims = SessionClaimsSchema.parse(
+      JSON.parse(Buffer.from(payload, "base64url").toString("utf8")),
+    );
     if (claims.expiresAt <= now) throw new Error();
     return claims;
   } catch {

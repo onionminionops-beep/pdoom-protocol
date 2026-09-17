@@ -1,8 +1,4 @@
-import {
-  neutralInput,
-  PlayerInputV1Schema,
-  type PlayerInputV1,
-} from "./contracts/input";
+import { neutralInput, PlayerInputV1Schema, type PlayerInputV1 } from "./contracts/input";
 import type { DirectiveId } from "./contracts/directives";
 import type { LevelData, SimEvent, WorldState } from "./sim/types";
 import { createWorld } from "./sim/world";
@@ -45,12 +41,9 @@ export class HumanInputRecording {
       checked.basedOnTick !== world.tick ||
       world.tick !== this.replay.actions.length
     ) {
-      throw new Error(
-        "Recording requires consecutive inputs from one human episode.",
-      );
+      throw new Error("Recording requires consecutive inputs from one human episode.");
     }
-    const { horizontal, verticalAction, shoot, dash, interact, holdForMs } =
-      checked;
+    const { horizontal, verticalAction, shoot, dash, interact, holdForMs } = checked;
     this.replay.actions.push({
       horizontal,
       verticalAction,
@@ -138,22 +131,13 @@ export class ComparisonMetrics {
     this.startX = world.players.p2.pos.x;
   }
 
-  sample(
-    world: Readonly<WorldState>,
-    events: readonly SimEvent[],
-    fallback: boolean,
-  ): void {
+  sample(world: Readonly<WorldState>, events: readonly SimEvent[], fallback: boolean): void {
     for (const event of events) {
       if (event.type === "enemy_killed") this.teamKills++;
-      if (
-        event.type === "pickup" &&
-        event.playerId === "p2" &&
-        event.pickupType === "coin"
-      ) {
+      if (event.type === "pickup" && event.playerId === "p2" && event.pickupType === "coin") {
         this.jevCoins += event.value;
       }
-      if (event.type === "player_revived" && event.by === "p2")
-        this.jevRevives++;
+      if (event.type === "player_revived" && event.by === "p2") this.jevRevives++;
     }
     this.samples++;
     if (fallback) this.fallbackTicks++;
@@ -185,18 +169,13 @@ export class ComparisonMetrics {
       teamScore: world.score,
       teamCoins: world.coins,
       teamKills: this.teamKills,
-      teamDamageTaken:
-        world.players.p1.damageTaken + world.players.p2.damageTaken,
+      teamDamageTaken: world.players.p1.damageTaken + world.players.p2.damageTaken,
       jevCoins: this.jevCoins,
       jevRevives: this.jevRevives,
       jevProgressPx: this.progress,
-      averageTeammateDistancePx: this.samples
-        ? this.distanceSum / this.samples
-        : 0,
+      averageTeammateDistancePx: this.samples ? this.distanceSum / this.samples : 0,
       decisions: this.decisions,
-      averageLatencyMs: this.decisions
-        ? this.latencySum / this.decisions
-        : null,
+      averageLatencyMs: this.decisions ? this.latencySum / this.decisions : null,
       fallbackTicks: this.fallbackTicks,
     };
   }

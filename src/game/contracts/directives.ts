@@ -6,12 +6,7 @@ import { z } from "zod";
  * question instructions. It never touches physics, hitboxes, cooldowns, or
  * adds any code-side behaviour for JEV.
  */
-export const DirectiveIdSchema = z.enum([
-  "SPEEDRUNNER",
-  "COLLECTOR",
-  "SCORE_HUNTER",
-  "GUARDIAN",
-]);
+export const DirectiveIdSchema = z.enum(["SPEEDRUNNER", "COLLECTOR", "SCORE_HUNTER", "GUARDIAN"]);
 export type DirectiveId = z.infer<typeof DirectiveIdSchema>;
 
 export type QuestionId =

@@ -32,7 +32,10 @@ export class HumanController implements PlayerController {
   private bindings: KeyBindings;
   private target: EventTarget | null;
 
-  constructor(target: EventTarget | null = typeof window !== "undefined" ? window : null, bindings: KeyBindings = DEFAULT_BINDINGS) {
+  constructor(
+    target: EventTarget | null = typeof window !== "undefined" ? window : null,
+    bindings: KeyBindings = DEFAULT_BINDINGS,
+  ) {
     this.bindings = bindings;
     this.target = target;
     target?.addEventListener("keydown", this.onKeyDown);

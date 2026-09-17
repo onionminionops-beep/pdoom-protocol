@@ -20,12 +20,17 @@ export async function handleSession(request: Request): Promise<Response> {
     await limits.limitIp(clientIpKey(request, config), true);
     const { token, claims } = issueSession(body.episodeId, config);
     await limits.register(claims);
-    return Response.json(SessionResponseSchema.parse({
-      sessionToken: token, expiresAt: claims.expiresAt, requestBudget: claims.budget,
-      minDecisionIntervalMs: Math.ceil(Math.max(
-        AI_CONFIG.minIntervalMs, 60000 / config.ipPerMinute,
-      ) * 11 / 10),
-    }), { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      SessionResponseSchema.parse({
+        sessionToken: token,
+        expiresAt: claims.expiresAt,
+        requestBudget: claims.budget,
+        minDecisionIntervalMs: Math.ceil(
+          (Math.max(AI_CONFIG.minIntervalMs, 60000 / config.ipPerMinute) * 11) / 10,
+        ),
+      }),
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     return errorResponse(error);
   }

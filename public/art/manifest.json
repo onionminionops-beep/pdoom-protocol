@@ -964,30 +964,14 @@
     "tileSize": 32,
     "columns": 8,
     "tiles": {
-      "solid": [
-        0
-      ],
-      "oneway": [
-        1
-      ],
-      "hazard": [
-        2
-      ],
-      "gate": [
-        3
-      ],
-      "solid_top": [
-        4
-      ],
-      "solid_left": [
-        5
-      ],
-      "solid_right": [
-        6
-      ],
-      "solid_inner": [
-        7
-      ]
+      "solid": [0],
+      "oneway": [1],
+      "hazard": [2],
+      "gate": [3],
+      "solid_top": [4],
+      "solid_left": [5],
+      "solid_right": [6],
+      "solid_inner": [7]
     }
   },
   "backdrops": {

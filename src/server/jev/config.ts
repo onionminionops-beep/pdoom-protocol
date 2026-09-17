@@ -12,10 +12,15 @@ function positiveInteger(name: string, fallback: number): number {
   return parsed;
 }
 
-export function validateJevStorage(redisUrl: string | undefined, redisToken: string | undefined): void {
+export function validateJevStorage(
+  redisUrl: string | undefined,
+  redisToken: string | undefined,
+): void {
   const local = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
-  const deployed = process.env.VERCEL === "1" ||
-    process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
+  const deployed =
+    process.env.VERCEL === "1" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.VERCEL_ENV === "preview";
   if (Boolean(redisUrl) !== Boolean(redisToken) || (!redisUrl && (!local || deployed))) {
     throw new JevApiError("misconfigured", 503, "Jev storage is not configured.");
   }
@@ -26,8 +31,13 @@ export function getJevConfig() {
   if (!secret || Buffer.byteLength(secret) < 32) {
     throw new JevApiError("misconfigured", 503, "Jev sessions are not configured.");
   }
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const customRedis = Boolean(
+    process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_REDIS_REST_TOKEN,
+  );
+  const redisUrl = customRedis ? process.env.UPSTASH_REDIS_REST_URL : process.env.KV_REST_API_URL;
+  const redisToken = customRedis
+    ? process.env.UPSTASH_REDIS_REST_TOKEN
+    : process.env.KV_REST_API_TOKEN;
   validateJevStorage(redisUrl, redisToken);
   return {
     secret,
@@ -37,7 +47,10 @@ export function getJevConfig() {
     sessionsPerMinute: positiveInteger("JEV_IP_SESSIONS_PER_MINUTE", 10),
     dailyBudget: positiveInteger("JEV_GLOBAL_DAILY_BUDGET", 20000),
     timeoutMs: positiveInteger("JEV_REQUEST_TIMEOUT_MS", AI_CONFIG.requestTimeoutMs),
-    allowedOrigins: process.env.JEV_ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
+    allowedOrigins:
+      process.env.JEV_ALLOWED_ORIGINS?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [],
     redisUrl,
     redisToken,
   };

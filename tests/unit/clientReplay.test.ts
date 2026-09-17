@@ -39,25 +39,19 @@ describe("human input replay", () => {
       horizontal: "left",
       shoot: true,
     });
-    expect(replayHumanInput(replay, 1, "comparison")).toEqual(
-      neutralInput("comparison", 1),
-    );
+    expect(replayHumanInput(replay, 1, "comparison")).toEqual(neutralInput("comparison", 1));
   });
 
   it("rejects skipped ticks, old episodes and nonhuman recordings", () => {
     const world = initialWorld();
     const recording = new HumanInputRecording(world);
-    expect(() => recording.record(world, neutralInput("old", 0))).toThrow(
-      /one human episode/,
-    );
-    expect(() =>
-      recording.record(world, neutralInput(world.episodeId, 3)),
-    ).toThrow(/consecutive/);
+    expect(() => recording.record(world, neutralInput("old", 0))).toThrow(/one human episode/);
+    expect(() => recording.record(world, neutralInput(world.episodeId, 3))).toThrow(/consecutive/);
     world.slots.p1 = "MOCK_AI";
     expect(() => new HumanInputRecording(world)).toThrow(/human inputs/);
-    expect(() =>
-      recording.record(world, neutralInput(world.episodeId, 0)),
-    ).toThrow(/one human episode/);
+    expect(() => recording.record(world, neutralInput(world.episodeId, 0))).toThrow(
+      /one human episode/,
+    );
   });
 
   it("replays the human movement through the same simulation inputs", () => {
@@ -67,8 +61,7 @@ describe("human input replay", () => {
       const p1 = {
         ...neutralInput(original.episodeId, tick),
         horizontal: "right" as const,
-        verticalAction:
-          tick >= 10 && tick < 25 ? ("jump" as const) : ("none" as const),
+        verticalAction: tick >= 10 && tick < 25 ? ("jump" as const) : ("none" as const),
       };
       recording.record(original, p1);
       stepWorld(original, { p1, p2: neutralInput(original.episodeId, tick) });
@@ -92,13 +85,7 @@ describe("human input replay", () => {
     expect(comparison.seed).toBe(replay.seed);
     expect(comparison.directive).toBe("COLLECTOR");
     expect(() =>
-      createComparisonWorld(
-        replay,
-        CONSENSUS_HEIGHTS,
-        "COLLECTOR",
-        "recorded",
-        "JEV",
-      ),
+      createComparisonWorld(replay, CONSENSUS_HEIGHTS, "COLLECTOR", "recorded", "JEV"),
     ).toThrow(/fresh episode/);
     expect(() =>
       createComparisonWorld(

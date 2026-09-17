@@ -59,8 +59,7 @@ describe("recorded directive comparisons", () => {
       }
       expect(comparison.world.tick).toBe(20);
       const rebased = structuredClone(expected);
-      if (rebased.lastInput)
-        rebased.lastInput.episodeId = comparison.world.episodeId;
+      if (rebased.lastInput) rebased.lastInput.episodeId = comparison.world.episodeId;
       expect(comparison.world.players.p1).toEqual(rebased);
       expect(comparison.world.episodeId).not.toBe(replay.sourceEpisodeId);
       expect(comparison.comparison).toMatchObject({
@@ -102,15 +101,11 @@ it("fires on canvas clicks, releases outside it, and clears on pause", () => {
       tick: 0,
       nowMs: 0,
     });
-  canvas.dispatchEvent(
-    new MouseEvent("mousedown", { button: 0, bubbles: true }),
-  );
+  canvas.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
   expect(input().shoot).toBe(true);
   window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
   expect(input().shoot).toBe(false);
-  canvas.dispatchEvent(
-    new MouseEvent("mousedown", { button: 0, bubbles: true }),
-  );
+  canvas.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
   bridge.setEnabled(false);
   expect(input().shoot).toBe(false);
   canvas.remove();

@@ -13,7 +13,8 @@ interface Voice {
   bus: "sfx" | "music";
 }
 
-const clampVolume = (value: number) => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+const clampVolume = (value: number) =>
+  Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 
 export class WebAudioEngine implements AudioEngine {
   private context: AudioContext | null = null;
@@ -39,8 +40,11 @@ export class WebAudioEngine implements AudioEngine {
   async unlock(): Promise<void> {
     if (this.disposed) return;
     if (!this.context) {
-      if (!this.options.createContext && (typeof window === "undefined" || !window.AudioContext)) return;
-      const context = this.options.createContext ? this.options.createContext() : new window.AudioContext();
+      if (!this.options.createContext && (typeof window === "undefined" || !window.AudioContext))
+        return;
+      const context = this.options.createContext
+        ? this.options.createContext()
+        : new window.AudioContext();
       this.context = context;
       this.master = context.createGain();
       this.music = context.createGain();
@@ -63,10 +67,22 @@ export class WebAudioEngine implements AudioEngine {
     if (this.track && !this.timer) this.scheduleMusic();
   }
 
-  setMasterVolume(v: number): void { this.masterVolume = clampVolume(v); this.applyVolumes(); }
-  setMusicVolume(v: number): void { this.musicVolume = clampVolume(v); this.applyVolumes(); }
-  setSfxVolume(v: number): void { this.sfxVolume = clampVolume(v); this.applyVolumes(); }
-  setMuted(muted: boolean): void { this.muted = muted; this.applyVolumes(); }
+  setMasterVolume(v: number): void {
+    this.masterVolume = clampVolume(v);
+    this.applyVolumes();
+  }
+  setMusicVolume(v: number): void {
+    this.musicVolume = clampVolume(v);
+    this.applyVolumes();
+  }
+  setSfxVolume(v: number): void {
+    this.sfxVolume = clampVolume(v);
+    this.applyVolumes();
+  }
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.applyVolumes();
+  }
 
   private applyVolumes(): void {
     const time = this.context?.currentTime ?? 0;
@@ -84,7 +100,10 @@ export class WebAudioEngine implements AudioEngine {
         const player = "playerId" in event ? event.playerId : "";
         if (sound !== "dry" || now - (this.lastDryClick.get(player) ?? -Infinity) >= 0.18) {
           const x = "pos" in event ? event.pos.x : listenerX;
-          const pan = Number.isFinite(x) && Number.isFinite(listenerX) ? Math.max(-1, Math.min(1, (x - listenerX) / 480)) : 0;
+          const pan =
+            Number.isFinite(x) && Number.isFinite(listenerX)
+              ? Math.max(-1, Math.min(1, (x - listenerX) / 480))
+              : 0;
           for (const tone of SOUNDS[sound]) this.playTone(tone, "sfx", now, pan);
           if (sound === "dry") this.lastDryClick.set(player, now);
         }
@@ -96,7 +115,8 @@ export class WebAudioEngine implements AudioEngine {
   }
 
   private playTone(tone: Tone, bus: Voice["bus"], time: number, pan = 0): void {
-    const context = this.context, destination = bus === "sfx" ? this.sfx : this.music;
+    const context = this.context,
+      destination = bus === "sfx" ? this.sfx : this.music;
     if (!context || !destination || this.voices.size >= 64) return;
     const start = Math.max(context.currentTime, time + (tone.delay ?? 0));
     const end = start + tone.duration;
@@ -146,10 +166,11 @@ export class WebAudioEngine implements AudioEngine {
   }
 
   private cancelVoices(bus?: Voice["bus"]): void {
-    for (const voice of this.voices) if (!bus || voice.bus === bus) {
-      voice.source.stop();
-      this.release(voice);
-    }
+    for (const voice of this.voices)
+      if (!bus || voice.bus === bus) {
+        voice.source.stop();
+        this.release(voice);
+      }
   }
 
   startMusic(track: MusicTrack): void {
@@ -175,17 +196,42 @@ export class WebAudioEngine implements AudioEngine {
     if (this.nextBeat < now - step) this.nextBeat = now + 0.02;
     while (this.nextBeat < now + 0.16) {
       const lead = track.lead[this.beat % track.lead.length];
-      if (lead >= 0) this.playTone({
-        wave: track.wave, frequency: midiFrequency(track.root + lead), duration: step * 0.85, gain: 0.055,
-      }, "music", this.nextBeat, -0.2);
+      if (lead >= 0)
+        this.playTone(
+          {
+            wave: track.wave,
+            frequency: midiFrequency(track.root + lead),
+            duration: step * 0.85,
+            gain: 0.055,
+          },
+          "music",
+          this.nextBeat,
+          -0.2,
+        );
       if (this.beat % 4 === 0) {
-        this.playTone({
-          wave: "triangle", frequency: midiFrequency(track.root - 24 + track.bass[Math.floor(this.beat / 16) % 4]),
-          duration: step * 3, gain: 0.13,
-        }, "music", this.nextBeat, 0.15);
-        this.playTone({ wave: "sine", frequency: 110, endFrequency: 40, duration: 0.09, gain: 0.14 }, "music", this.nextBeat);
+        this.playTone(
+          {
+            wave: "triangle",
+            frequency: midiFrequency(track.root - 24 + track.bass[Math.floor(this.beat / 16) % 4]),
+            duration: step * 3,
+            gain: 0.13,
+          },
+          "music",
+          this.nextBeat,
+          0.15,
+        );
+        this.playTone(
+          { wave: "sine", frequency: 110, endFrequency: 40, duration: 0.09, gain: 0.14 },
+          "music",
+          this.nextBeat,
+        );
       } else if (this.beat % 2 === 0) {
-        this.playTone({ wave: "noise", frequency: 4500, duration: 0.025, gain: 0.025 }, "music", this.nextBeat, 0.3);
+        this.playTone(
+          { wave: "noise", frequency: 4500, duration: 0.025, gain: 0.025 },
+          "music",
+          this.nextBeat,
+          0.3,
+        );
       }
       this.beat++;
       this.nextBeat += step;

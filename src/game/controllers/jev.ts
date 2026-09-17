@@ -131,9 +131,14 @@ export class JevController implements PlayerController {
       const data: unknown = await response.json();
       if (!response.ok) {
         const parsed = ApiErrorSchema.safeParse(data);
-        throw new RequestFailure(parsed.success ? parsed.data : {
-          error: "upstream_unavailable", message: "Jev request failed.",
-        });
+        throw new RequestFailure(
+          parsed.success
+            ? parsed.data
+            : {
+                error: "upstream_unavailable",
+                message: "Jev request failed.",
+              },
+        );
       }
       return data;
     } finally {
@@ -150,7 +155,10 @@ export class JevController implements PlayerController {
     const backoff = this.fallback
       ? AI_CONFIG.retryLiveAfterMs
       : AI_CONFIG.minIntervalMs * 2 ** Math.min(failures, 6);
-    this.nextRequestAt = Math.max(this.nextRequestAt, this.now() + Math.max(backoff, detail?.retryAfterMs ?? 0));
+    this.nextRequestAt = Math.max(
+      this.nextRequestAt,
+      this.now() + Math.max(backoff, detail?.retryAfterMs ?? 0),
+    );
     this.publish({
       mode: this.fallback ? "fallback_mock" : "error",
       consecutiveFailures: failures,
@@ -165,16 +173,22 @@ export class JevController implements PlayerController {
     const started = this.now();
     this.publish({ mode: this.fallback ? "fallback_mock" : "connecting" });
     try {
-      const session = SessionResponseSchema.parse(await this.post("/api/jev/session", { episodeId: this.episodeId }));
+      const session = SessionResponseSchema.parse(
+        await this.post("/api/jev/session", { episodeId: this.episodeId }),
+      );
       if (this.disposed || generation !== this.generation) return;
-      if (session.expiresAt <= Date.now() || session.requestBudget <= 0) throw new Error("Invalid session");
+      if (session.expiresAt <= Date.now() || session.requestBudget <= 0)
+        throw new Error("Invalid session");
       this.session = session;
       this.sessionExpiresAt = this.now() + (session.expiresAt - Date.now());
       this.sessionRequests = 0;
       this.nextRequestAt = Math.max(this.nextRequestAt, started + AI_CONFIG.minIntervalMs);
       this.publish({
         mode: this.fallback ? "fallback_mock" : "waiting",
-        minDecisionIntervalMs: Math.max(AI_CONFIG.minIntervalMs, session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs),
+        minDecisionIntervalMs: Math.max(
+          AI_CONFIG.minIntervalMs,
+          session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs,
+        ),
       });
     } catch (error) {
       if (!this.disposed && generation === this.generation) this.failed(error);
@@ -189,7 +203,9 @@ export class JevController implements PlayerController {
     this.inFlight = true;
     const generation = this.generation;
     const started = this.now();
-    this.nextRequestAt = started + Math.max(AI_CONFIG.minIntervalMs, session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs);
+    this.nextRequestAt =
+      started +
+      Math.max(AI_CONFIG.minIntervalMs, session.minDecisionIntervalMs ?? AI_CONFIG.minIntervalMs);
     this.lastSentTick = observation.tick;
     this.sessionRequests++;
     this.publish({
@@ -197,18 +213,25 @@ export class JevController implements PlayerController {
       requestsSent: this.status.requestsSent + 1,
     });
     try {
-      const result = DecisionResponseSchema.parse(await this.post("/api/jev/decision", {
-        sessionToken: session.sessionToken, observation,
-      }));
+      const result = DecisionResponseSchema.parse(
+        await this.post("/api/jev/decision", {
+          sessionToken: session.sessionToken,
+          observation,
+        }),
+      );
       if (this.disposed || generation !== this.generation) return;
       const received = this.now();
       const latency = received - started;
       this.publish({ lastRoundTripMs: latency, lastLatencyMs: result.latencyMs });
-      if (result.episodeId !== observation.episodeId || result.input.episodeId !== observation.episodeId ||
-          result.basedOnTick !== observation.tick || result.input.basedOnTick !== observation.tick ||
-          (this.input && result.basedOnTick <= this.input.basedOnTick) ||
-          this.latestTick - result.basedOnTick > AI_CONFIG.maxTickAgeTicks ||
-          latency > AI_CONFIG.maxResponseAgeMs) {
+      if (
+        result.episodeId !== observation.episodeId ||
+        result.input.episodeId !== observation.episodeId ||
+        result.basedOnTick !== observation.tick ||
+        result.input.basedOnTick !== observation.tick ||
+        (this.input && result.basedOnTick <= this.input.basedOnTick) ||
+        this.latestTick - result.basedOnTick > AI_CONFIG.maxTickAgeTicks ||
+        latency > AI_CONFIG.maxResponseAgeMs
+      ) {
         throw new RequestFailure({ error: "invalid_request", message: "Decision is stale." });
       }
       this.input = result.input;
@@ -216,7 +239,10 @@ export class JevController implements PlayerController {
       this.inputAcceptedAt = received;
       this.lastDecision = { ...result, observation };
       this.fallback = false;
-      this.nextRequestAt = Math.max(this.nextRequestAt, started + Math.max(result.input.holdForMs, latency * 1.2));
+      this.nextRequestAt = Math.max(
+        this.nextRequestAt,
+        started + Math.max(result.input.holdForMs, latency * 1.2),
+      );
       this.publish({
         mode: "live",
         lastLatencyMs: result.latencyMs,
@@ -250,9 +276,13 @@ export class JevController implements PlayerController {
       }
     }
     if (this.fallback) return this.mock.update(ctx);
-    if (this.input && now - this.inputObservedAt <= AI_CONFIG.maxResponseAgeMs &&
-        now - this.inputAcceptedAt < Math.min(AI_CONFIG.staleMs, this.input.holdForMs) &&
-        ctx.tick - this.input.basedOnTick <= AI_CONFIG.maxTickAgeTicks) return { ...this.input };
+    if (
+      this.input &&
+      now - this.inputObservedAt <= AI_CONFIG.maxResponseAgeMs &&
+      now - this.inputAcceptedAt < Math.min(AI_CONFIG.staleMs, this.input.holdForMs) &&
+      ctx.tick - this.input.basedOnTick <= AI_CONFIG.maxTickAgeTicks
+    )
+      return { ...this.input };
     return neutralInput(ctx.episodeId, ctx.tick);
   }
 

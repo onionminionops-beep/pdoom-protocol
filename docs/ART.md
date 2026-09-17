@@ -73,34 +73,34 @@ require a uniform pure `#0000ff` background and exclude that blue from the
 subject. Billboard lettering is drawn by the deterministic bitmap font; the
 model only paints the blank sign. The logo is a text-free original crest.
 
-| Asset | Subject / distinguishing prompt | Revision | Fallback seed |
-| --- | --- | --- | --- |
-| user | Human runner facing right; amber jacket, short cyan scarf, slate trousers, swept hair, tiny blaster at chest. Chibi, head one third of height, broad torso, thick limbs, planted feet, narrow silhouette, at most 12 solid colors. | 2 | 42017 |
-| jev | Friendly robot facing right; large cyan visor, slate shell, short magenta scarf, white chest, thick legs, tiny blaster at chest. Same chibi proportions and simplicity as User. | 2 | 42017 |
-| doom_prophet | Thin hooded preacher facing right, ragged indigo robe, hunched shoulders, amber eyes, blank placard. | 1 | 42017 |
-| catastrophe_prophet | Angular alarmist facing right, wild white hair, magenta coat, screen with abstract red descending graph. | 1 | 42017 |
-| datacenter_blockader | Stout barricade builder facing right, acid green vest, hard hat, boots, dark barrier plate. | 1 | 42017 |
-| purity_enforcer | Heavy robot facing right, ivory/violet armor, magenta visor, rectangular forearm shield. | 1 | 42017 |
-| hall_monitor | Hovering rectangular indigo drone facing right, cyan eye, amber thrusters, antenna. | 1 | 42017 |
-| reply_horde | Tiny scuttling robot facing right, acid green angry screen face, little legs, magenta cable tail. | 1 | 42017 |
-| consensus_engine | Symmetrical industrial computer idol, indigo server towers, huge magenta mechanical eye, cyan conduits, green reactor, armored clamps. | 1 | 42017 |
-| coin | Chunky amber token, square circuit inset, side view. | 1 | 42017 |
-| health | Cyan medical canister with green capsule inset; no cross symbol. | 1 | 42017 |
-| ammo | Open indigo ammunition box with three amber energy cells. | 1 | 42017 |
-| fact_check | Cyan crystalline diamond with white check-shaped geometric spark. | 1 | 42017 |
-| weapon_crate | Violet armored supply crate, amber clasps, cyan barrel icon. | 1 | 42017 |
-| switch | Wall lever with indigo housing, amber handle, green lamp. | 1 | 42017 |
-| exit | Industrial doorway, luminous cyan frame, indigo interior, amber corner plates. | 1 | 42017 |
-| projectiles | Horizontal cyan bolt pointing right, white center, short angular trail. | 1 | 42017 |
-| fx | Angular eight-pointed amber/cyan impact spark, no glow blur. | 1 | 42017 |
-| tiles | Seamless orthographic dark concrete tile, indigo seams, bolts, restrained cyan highlights, edge-to-edge. | 1 | 42017 |
-| bg_far | Distant indigo skyscrapers and spires, dim cyan windows, dark night sky, empty upper half. | 1 | 42017 |
-| bg_mid | Industrial rooftops, ducts, magenta windows, cyan antennas, empty transparent upper half. | 1 | 42017 |
-| bg_near | Dark foreground pipes, railings and amber hazard lamps, empty transparent upper half. | 1 | 42017 |
-| billboards | Worn indigo metal sign, amber border, blank central panel. | 1 | 42017 |
-| portrait_user | Amber jacket runner bust, cyan scarf, swept dark hair, determined, facing right. | 1 | 42017 |
-| portrait_jev | Friendly indigo robot bust, cyan visor, magenta scarf, white armor. | 1 | 42017 |
-| logo | Linked cyan/amber circuit brackets protecting a magenta diamond reactor; no letters. | 1 | 42017 |
+| Asset                | Subject / distinguishing prompt                                                                                                                                                                                                    | Revision | Fallback seed |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| user                 | Human runner facing right; amber jacket, short cyan scarf, slate trousers, swept hair, tiny blaster at chest. Chibi, head one third of height, broad torso, thick limbs, planted feet, narrow silhouette, at most 12 solid colors. | 2        | 42017         |
+| jev                  | Friendly robot facing right; large cyan visor, slate shell, short magenta scarf, white chest, thick legs, tiny blaster at chest. Same chibi proportions and simplicity as User.                                                    | 2        | 42017         |
+| doom_prophet         | Thin hooded preacher facing right, ragged indigo robe, hunched shoulders, amber eyes, blank placard.                                                                                                                               | 1        | 42017         |
+| catastrophe_prophet  | Angular alarmist facing right, wild white hair, magenta coat, screen with abstract red descending graph.                                                                                                                           | 1        | 42017         |
+| datacenter_blockader | Stout barricade builder facing right, acid green vest, hard hat, boots, dark barrier plate.                                                                                                                                        | 1        | 42017         |
+| purity_enforcer      | Heavy robot facing right, ivory/violet armor, magenta visor, rectangular forearm shield.                                                                                                                                           | 1        | 42017         |
+| hall_monitor         | Hovering rectangular indigo drone facing right, cyan eye, amber thrusters, antenna.                                                                                                                                                | 1        | 42017         |
+| reply_horde          | Tiny scuttling robot facing right, acid green angry screen face, little legs, magenta cable tail.                                                                                                                                  | 1        | 42017         |
+| consensus_engine     | Symmetrical industrial computer idol, indigo server towers, huge magenta mechanical eye, cyan conduits, green reactor, armored clamps.                                                                                             | 1        | 42017         |
+| coin                 | Chunky amber token, square circuit inset, side view.                                                                                                                                                                               | 1        | 42017         |
+| health               | Cyan medical canister with green capsule inset; no cross symbol.                                                                                                                                                                   | 1        | 42017         |
+| ammo                 | Open indigo ammunition box with three amber energy cells.                                                                                                                                                                          | 1        | 42017         |
+| fact_check           | Cyan crystalline diamond with white check-shaped geometric spark.                                                                                                                                                                  | 1        | 42017         |
+| weapon_crate         | Violet armored supply crate, amber clasps, cyan barrel icon.                                                                                                                                                                       | 1        | 42017         |
+| switch               | Wall lever with indigo housing, amber handle, green lamp.                                                                                                                                                                          | 1        | 42017         |
+| exit                 | Industrial doorway, luminous cyan frame, indigo interior, amber corner plates.                                                                                                                                                     | 1        | 42017         |
+| projectiles          | Horizontal cyan bolt pointing right, white center, short angular trail.                                                                                                                                                            | 1        | 42017         |
+| fx                   | Angular eight-pointed amber/cyan impact spark, no glow blur.                                                                                                                                                                       | 1        | 42017         |
+| tiles                | Seamless orthographic dark concrete tile, indigo seams, bolts, restrained cyan highlights, edge-to-edge.                                                                                                                           | 1        | 42017         |
+| bg_far               | Distant indigo skyscrapers and spires, dim cyan windows, dark night sky, empty upper half.                                                                                                                                         | 1        | 42017         |
+| bg_mid               | Industrial rooftops, ducts, magenta windows, cyan antennas, empty transparent upper half.                                                                                                                                          | 1        | 42017         |
+| bg_near              | Dark foreground pipes, railings and amber hazard lamps, empty transparent upper half.                                                                                                                                              | 1        | 42017         |
+| billboards           | Worn indigo metal sign, amber border, blank central panel.                                                                                                                                                                         | 1        | 42017         |
+| portrait_user        | Amber jacket runner bust, cyan scarf, swept dark hair, determined, facing right.                                                                                                                                                   | 1        | 42017         |
+| portrait_jev         | Friendly indigo robot bust, cyan visor, magenta scarf, white armor.                                                                                                                                                                | 1        | 42017         |
+| logo                 | Linked cyan/amber circuit brackets protecting a magenta diamond reactor; no letters.                                                                                                                                               | 1        | 42017         |
 
 ## Layout and review
 

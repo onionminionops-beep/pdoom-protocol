@@ -10,18 +10,24 @@ Use Node 22 and `npm ci`. Copy `.env.example` to `.env.local` for Next.js, or se
 these variables in the hosting environment. All variables below are server-only;
 do not prefix them with `NEXT_PUBLIC_`.
 
-| Variable | Default / meaning |
-| --- | --- |
-| `TYPESAFE_API_KEY` | Required for live inference. TypeSafe API key. |
-| `JEV_SESSION_SECRET` | Required for sessions, at least 32 bytes. Generate with `openssl rand -hex 32`. Keep consistent across instances; rotation invalidates existing tokens. |
-| `UPSTASH_REDIS_REST_URL` | Required in production and deployed runtimes, together with its token. Optional for local development and unit tests. |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash REST token with read/write/script access. |
-| `JEV_ALLOWED_ORIGINS` | Comma-separated exact browser origins, e.g. `https://game.example,http://localhost:3000`. Configure production and preview origins explicitly. |
-| `JEV_SESSION_REQUEST_BUDGET` | `1200` inference attempts per session. |
-| `JEV_IP_REQUESTS_PER_MINUTE` | `120` decision requests per IP, sliding window. |
-| `JEV_IP_SESSIONS_PER_MINUTE` | `10` session creations per IP, separate sliding window. |
-| `JEV_GLOBAL_DAILY_BUDGET` | `20000` inference attempts across all sessions, UTC day. |
-| `JEV_REQUEST_TIMEOUT_MS` | `1500` for the TypeSafe request, including reading its response. |
+| Variable                     | Default / meaning                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TYPESAFE_API_KEY`           | Required for live inference. TypeSafe API key.                                                                                                          |
+| `JEV_SESSION_SECRET`         | Required for sessions, at least 32 bytes. Generate with `openssl rand -hex 32`. Keep consistent across instances; rotation invalidates existing tokens. |
+| `UPSTASH_REDIS_REST_URL`     | Required in production and deployed runtimes, together with its token. Optional for local development and unit tests.                                   |
+| `UPSTASH_REDIS_REST_TOKEN`   | Upstash REST token with read/write/script access.                                                                                                       |
+| `JEV_ALLOWED_ORIGINS`        | Comma-separated exact browser origins, e.g. `https://game.example,http://localhost:3000`. Configure production and preview origins explicitly.          |
+| `JEV_SESSION_REQUEST_BUDGET` | `1200` inference attempts per session.                                                                                                                  |
+| `JEV_IP_REQUESTS_PER_MINUTE` | `120` decision requests per IP, sliding window.                                                                                                         |
+| `JEV_IP_SESSIONS_PER_MINUTE` | `10` session creations per IP, separate sliding window.                                                                                                 |
+| `JEV_GLOBAL_DAILY_BUDGET`    | `20000` inference attempts across all sessions, UTC day.                                                                                                |
+| `JEV_REQUEST_TIMEOUT_MS`     | `1500` for the TypeSafe request, including reading its response.                                                                                        |
+
+Vercel Marketplace's Upstash integration supplies `KV_REST_API_URL` and
+`KV_REST_API_TOKEN`. These are accepted together when no explicit
+`UPSTASH_REDIS_REST_*` values are configured. Explicit Upstash credentials take
+precedence; incomplete pairs are rejected rather than mixed across providers.
+All four names are server-only.
 
 Origin must match the Host header. Missing/null origins and cross-site browser
 requests are rejected. With no explicit origin allowlist, the request URL host must
@@ -87,14 +93,14 @@ episode. A token cannot be used with another episode.
 
 ## Questions, directives and confidence
 
-| `QuestionId` | Choices | Threshold / fallback |
-| --- | --- | --- |
-| `horizontal_input` | `left`, `neutral`, `right` | `0.40` / `neutral` |
-| `vertical_action` | `none`, `jump`, `drop` | `0.45` / `none` |
-| `shoot_input` | `"true"`, `"false"` | `0.50` / `false` |
-| `dash_input` | `"true"`, `"false"` | `0.55` / `false` |
-| `interaction_input` | `"true"`, `"false"` | `0.50` / `false` |
-| `input_duration` | `"100"`, `"150"`, `"200"`, `"250"` | `0.40` / `100` ms |
+| `QuestionId`        | Choices                            | Threshold / fallback |
+| ------------------- | ---------------------------------- | -------------------- |
+| `horizontal_input`  | `left`, `neutral`, `right`         | `0.40` / `neutral`   |
+| `vertical_action`   | `none`, `jump`, `drop`             | `0.45` / `none`      |
+| `shoot_input`       | `"true"`, `"false"`                | `0.50` / `false`     |
+| `dash_input`        | `"true"`, `"false"`                | `0.55` / `false`     |
+| `interaction_input` | `"true"`, `"false"`                | `0.50` / `false`     |
+| `input_duration`    | `"100"`, `"150"`, `"200"`, `"250"` | `0.40` / `100` ms    |
 
 Each question combines a base instruction with
 `DIRECTIVES[obs.directive.id].instructionOverrides[questionId]`. Overrides are
@@ -137,8 +143,11 @@ const controller = new JevController({
 });
 // Each fixed simulation tick:
 const input = controller.update({
-  world, playerId: "p2", episodeId: world.episodeId,
-  tick: world.tick, nowMs: performance.now(),
+  world,
+  playerId: "p2",
+  episodeId: world.episodeId,
+  tick: world.tick,
+  nowMs: performance.now(),
 });
 // Pass input to the existing stepWorld input map.
 // On unmount/controller replacement:
@@ -278,27 +287,39 @@ This is one observation, not a gameplay benchmark. The actual response was:
   "model": "jev-1.13.0",
   "answers": {
     "horizontal_input": {
-      "type": "choice", "choice": "right", "confidence": 0.73,
+      "type": "choice",
+      "choice": "right",
+      "confidence": 0.73,
       "probabilities": { "neutral": 0.18, "right": 0.8099999999999999, "left": 0.01 }
     },
     "vertical_action": {
-      "type": "choice", "choice": "none", "confidence": 0.5,
+      "type": "choice",
+      "choice": "none",
+      "confidence": 0.5,
       "probabilities": { "drop": 0.08, "none": 0.67, "jump": 0.25 }
     },
     "shoot_input": {
-      "type": "choice", "choice": "true", "confidence": 1,
+      "type": "choice",
+      "choice": "true",
+      "confidence": 1,
       "probabilities": { "true": 1, "false": 0 }
     },
     "dash_input": {
-      "type": "choice", "choice": "true", "confidence": 0.03,
+      "type": "choice",
+      "choice": "true",
+      "confidence": 0.03,
       "probabilities": { "true": 0.52, "false": 0.48 }
     },
     "interaction_input": {
-      "type": "choice", "choice": "false", "confidence": 1,
+      "type": "choice",
+      "choice": "false",
+      "confidence": 1,
       "probabilities": { "true": 0, "false": 1 }
     },
     "input_duration": {
-      "type": "choice", "choice": "250", "confidence": 0.12,
+      "type": "choice",
+      "choice": "250",
+      "confidence": 0.12,
       "probabilities": { "100": 0.26, "150": 0.17, "200": 0.23, "250": 0.34 }
     }
   },

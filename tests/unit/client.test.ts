@@ -73,10 +73,11 @@ describe("episode replacement", () => {
     expect(next.episodeId).not.toBe(previous.episodeId);
     expect(next.seed).toBe(previous.seed);
     const initialX = next.players.p1.pos.x;
-    for (let i = 0; i < 30; i++) stepWorld(next, {
-      p1: { ...neutralInput(previous.episodeId, i), horizontal: "right" },
-      p2: neutralInput(next.episodeId, i),
-    });
+    for (let i = 0; i < 30; i++)
+      stepWorld(next, {
+        p1: { ...neutralInput(previous.episodeId, i), horizontal: "right" },
+        p2: neutralInput(next.episodeId, i),
+      });
     expect(next.players.p1.pos.x).toBe(initialX);
     stepWorld(next, {
       p1: { ...neutralInput(next.episodeId, next.tick), horizontal: "right" },
@@ -88,15 +89,22 @@ describe("episode replacement", () => {
 
 describe("optional art", () => {
   const sheet: SpriteSheetDef = {
-    key: "user", file: "characters/user.png", frameWidth: 32, frameHeight: 48,
+    key: "user",
+    file: "characters/user.png",
+    frameWidth: 32,
+    frameHeight: 48,
     originOffset: { x: 0, y: 0 },
     anims: [{ name: "idle", row: 2, frames: 4, fps: 10, loop: true }],
   };
 
   it("accepts partial manifests and rejects unsafe asset paths", () => {
-    expect(parseRenderManifest({ version: 1, characters: { user: sheet } }).characters?.user).toEqual(sheet);
+    expect(
+      parseRenderManifest({ version: 1, characters: { user: sheet } }).characters?.user,
+    ).toEqual(sheet);
     expect(parseRenderManifest(undefined)).toEqual({});
-    expect(parseRenderManifest({ version: 1, characters: { user: { ...sheet, file: "../secret" } } })).toEqual({});
+    expect(
+      parseRenderManifest({ version: 1, characters: { user: { ...sheet, file: "../secret" } } }),
+    ).toEqual({});
   });
 
   it("calculates looping and terminal animation frames", () => {

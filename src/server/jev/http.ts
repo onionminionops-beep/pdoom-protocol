@@ -12,8 +12,11 @@ export function validateOrigin(request: Request, allowedOrigins: string[]): void
   let valid = false;
   try {
     const parsed = new URL(origin ?? "");
-    valid = parsed.origin === origin && ["http:", "https:"].includes(parsed.protocol) &&
-      parsed.host === host && (!allowedOrigins.length || allowedOrigins.includes(parsed.origin));
+    valid =
+      parsed.origin === origin &&
+      ["http:", "https:"].includes(parsed.protocol) &&
+      parsed.host === host &&
+      (!allowedOrigins.length || allowedOrigins.includes(parsed.origin));
     if (!allowedOrigins.length) valid = valid && parsed.host === target.host;
   } catch {}
   if (!valid || request.headers.get("sec-fetch-site") === "cross-site") {
@@ -29,8 +32,14 @@ export function clientIpKey(request: Request, config: JevConfig): string {
   return createHmac("sha256", config.secret).update(identity).digest("hex");
 }
 
-export async function readJson<T>(request: Request, schema: z.ZodType<T>, maxBytes = 32 * 1024): Promise<T> {
-  if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+export async function readJson<T>(
+  request: Request,
+  schema: z.ZodType<T>,
+  maxBytes = 32 * 1024,
+): Promise<T> {
+  if (
+    request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json"
+  ) {
     throw new JevApiError("invalid_request", 400, "A JSON request body is required.");
   }
   const length = request.headers.get("content-length");

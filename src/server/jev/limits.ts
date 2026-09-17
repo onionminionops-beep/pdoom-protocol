@@ -13,7 +13,10 @@ export interface JevLimits {
 
 const DAY_MS = 86400000;
 
-function denied(code: "rate_limited" | "session_budget_exhausted" | "global_budget_exhausted", retryAfterMs?: number): never {
+function denied(
+  code: "rate_limited" | "session_budget_exhausted" | "global_budget_exhausted",
+  retryAfterMs?: number,
+): never {
   throw new JevApiError(code, 429, "Jev request budget reached.", retryAfterMs);
 }
 
@@ -31,7 +34,10 @@ export class MemoryJevLimits implements JevLimits {
   private day = -1;
   private dailyUsed = 0;
 
-  constructor(private readonly config: JevConfig, private readonly now = Date.now) {}
+  constructor(
+    private readonly config: JevConfig,
+    private readonly now = Date.now,
+  ) {}
 
   async limitIp(ip: string, issuingSession: boolean): Promise<void> {
     const now = this.now();
@@ -56,15 +62,18 @@ export class MemoryJevLimits implements JevLimits {
   async claim(session: SessionClaims, tick: number): Promise<void> {
     const now = this.now();
     const entry = this.sessions.get(session.id);
-    if (!entry || entry.session.episodeId !== session.episodeId || entry.session.expiresAt <= now) invalidSession();
+    if (!entry || entry.session.episodeId !== session.episodeId || entry.session.expiresAt <= now)
+      invalidSession();
     if (tick <= entry.tick) staleTick();
-    if (entry.used >= Math.min(session.budget, entry.session.budget)) denied("session_budget_exhausted");
+    if (entry.used >= Math.min(session.budget, entry.session.budget))
+      denied("session_budget_exhausted");
     const day = Math.floor(now / DAY_MS);
     if (this.day !== day) {
       this.day = day;
       this.dailyUsed = 0;
     }
-    if (this.dailyUsed >= this.config.dailyBudget) denied("global_budget_exhausted", (day + 1) * DAY_MS - now);
+    if (this.dailyUsed >= this.config.dailyBudget)
+      denied("global_budget_exhausted", (day + 1) * DAY_MS - now);
     entry.tick = tick;
     entry.used++;
     this.dailyUsed++;
@@ -87,14 +96,33 @@ export class RedisJevLimits implements JevLimits {
   private readonly issuance: Ratelimit;
   private readonly daily: Ratelimit;
 
-  constructor(private readonly config: JevConfig, private readonly redis: Redis) {
+  constructor(
+    private readonly config: JevConfig,
+    private readonly redis: Redis,
+  ) {
     const common = { redis, analytics: false, ephemeralCache: false as const, timeout: 2000 };
-    this.ip = new Ratelimit({ ...common, prefix: "jev:ip", limiter: Ratelimit.slidingWindow(config.ipPerMinute, "1 m") });
-    this.issuance = new Ratelimit({ ...common, prefix: "jev:issuance", limiter: Ratelimit.slidingWindow(config.sessionsPerMinute, "1 m") });
-    this.daily = new Ratelimit({ ...common, prefix: "jev:daily", limiter: Ratelimit.fixedWindow(config.dailyBudget, "1 d") });
+    this.ip = new Ratelimit({
+      ...common,
+      prefix: "jev:ip",
+      limiter: Ratelimit.slidingWindow(config.ipPerMinute, "1 m"),
+    });
+    this.issuance = new Ratelimit({
+      ...common,
+      prefix: "jev:issuance",
+      limiter: Ratelimit.slidingWindow(config.sessionsPerMinute, "1 m"),
+    });
+    this.daily = new Ratelimit({
+      ...common,
+      prefix: "jev:daily",
+      limiter: Ratelimit.fixedWindow(config.dailyBudget, "1 d"),
+    });
   }
 
-  private async check(limiter: Ratelimit, key: string, code: "rate_limited" | "global_budget_exhausted") {
+  private async check(
+    limiter: Ratelimit,
+    key: string,
+    code: "rate_limited" | "global_budget_exhausted",
+  ) {
     const result = await limiter.limit(key);
     await result.pending;
     if (result.reason === "timeout") {
@@ -110,19 +138,28 @@ export class RedisJevLimits implements JevLimits {
   async register(session: SessionClaims): Promise<void> {
     const key = `jev:session:${session.id}`;
     const transaction = this.redis.multi();
-    transaction.hset(key, { episode: session.episodeId, expires: session.expiresAt, tick: -1, used: 0, budget: session.budget });
+    transaction.hset(key, {
+      episode: session.episodeId,
+      expires: session.expiresAt,
+      tick: -1,
+      used: 0,
+      budget: session.budget,
+    });
     transaction.pexpireat(key, session.expiresAt);
     await transaction.exec();
   }
 
   async claim(session: SessionClaims, tick: number): Promise<void> {
-    const result = await this.redis.eval<(string | number)[], number>(CLAIM_SCRIPT, [`jev:session:${session.id}`], [
-      session.episodeId, tick, Date.now(), session.budget,
-    ]);
+    const result = await this.redis.eval<(string | number)[], number>(
+      CLAIM_SCRIPT,
+      [`jev:session:${session.id}`],
+      [session.episodeId, tick, Date.now(), session.budget],
+    );
     if (result === -1) invalidSession();
     if (result === -2) staleTick();
     if (result === -3) denied("session_budget_exhausted");
-    if (result !== 1) throw new JevApiError("upstream_unavailable", 503, "Jev storage is unavailable.");
+    if (result !== 1)
+      throw new JevApiError("upstream_unavailable", 503, "Jev storage is unavailable.");
     await this.check(this.daily, "all", "global_budget_exhausted");
   }
 }
@@ -135,10 +172,15 @@ export function getJevLimits(config: JevConfig): JevLimits {
   if (limits instanceof MemoryJevLimits && config.redisUrl) limits = undefined;
   if (limits) return limits;
   if (config.redisUrl && config.redisToken) {
-    limits = new RedisJevLimits(config, new Redis({
-      url: config.redisUrl, token: config.redisToken, retry: false,
-      signal: () => AbortSignal.timeout(2000),
-    }));
+    limits = new RedisJevLimits(
+      config,
+      new Redis({
+        url: config.redisUrl,
+        token: config.redisToken,
+        retry: false,
+        signal: () => AbortSignal.timeout(2000),
+      }),
+    );
   } else {
     limits = new MemoryJevLimits(config);
     if (process.env.NODE_ENV === "development" && !warned) {

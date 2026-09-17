@@ -20,21 +20,15 @@ export function ComparisonPanel({
   onCapture,
   onRun,
 }: Props) {
-  const canRun =
-    replay !== null && (companion === "JEV" || companion === "MOCK_AI");
+  const canRun = replay !== null && (companion === "JEV" || companion === "MOCK_AI");
   return (
     <section className={styles.panel} aria-label="Directive comparison">
       <h3>Directive comparison</h3>
       <p>
-        Save your human inputs, then replay them with each priority. Every run
-        uses the same seed and recorded inputs. Jev decisions and network timing
-        can vary.
+        Save your human inputs, then replay them with each priority. Every run uses the same seed
+        and recorded inputs. Jev decisions and network timing can vary.
       </p>
-      <button
-        className="secondary-button"
-        disabled={!canCapture}
-        onClick={onCapture}
-      >
+      <button className="secondary-button" disabled={!canCapture} onClick={onCapture}>
         Save human replay
       </button>
       <p role="status">
@@ -44,8 +38,8 @@ export function ComparisonPanel({
       </p>
       {companion === "MOCK_AI" && (
         <p>
-          Mock AI uses scripted priorities as an offline baseline. These results
-          are not live Jev decisions.
+          Mock AI uses scripted priorities as an offline baseline. These results are not live Jev
+          decisions.
         </p>
       )}
       <div className={styles.actions}>
@@ -61,12 +55,7 @@ export function ComparisonPanel({
         ))}
       </div>
       {results.length > 0 && (
-        <div
-          className={styles.table}
-          tabIndex={0}
-          role="region"
-          aria-label="Comparison results"
-        >
+        <div className={styles.table} tabIndex={0} role="region" aria-label="Comparison results">
           <table>
             <caption>Measured outcomes for the saved human replay</caption>
             <thead>

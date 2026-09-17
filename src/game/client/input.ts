@@ -31,13 +31,21 @@ export class HumanInputBridge {
 
   private synchronize(): void {
     for (const action of ACTIONS) {
-      this.controller.setKey(DEFAULT_BINDINGS[action][0], (action === "shoot" && this.mousePressed) || this.bindings[action].some((key) => this.pressed.has(key)));
+      this.controller.setKey(
+        DEFAULT_BINDINGS[action][0],
+        (action === "shoot" && this.mousePressed) ||
+          this.bindings[action].some((key) => this.pressed.has(key)),
+      );
     }
   }
 
   private keyDown = (event: KeyboardEvent): void => {
     if (!this.enabled || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.target instanceof Element && event.target.closest("input,select,textarea,button,a,[contenteditable=true]")) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("input,select,textarea,button,a,[contenteditable=true]")
+    )
+      return;
     if (!ACTIONS.some((action) => this.bindings[action].includes(event.code))) return;
     event.preventDefault();
     this.pressed.add(event.code);

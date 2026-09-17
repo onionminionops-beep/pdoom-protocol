@@ -85,6 +85,10 @@ server-only values. Never prefix these with `NEXT_PUBLIC_` or commit real secret
 | `JEV_GLOBAL_DAILY_BUDGET`    | 20,000 inference attempts per UTC day.                             |
 | `JEV_REQUEST_TIMEOUT_MS`     | 1,500 ms upstream timeout.                                         |
 
+Vercel Marketplace supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`; the server
+accepts that pair when no explicit Upstash credentials are set. Partial pairs fail
+closed. The integration manages these values, including rotations.
+
 Local development/test can use an in-memory limiter when both Redis variables are
 absent. Production and deployed runtimes fail closed without shared storage.
 Ordinary headless tests require no API credentials; do not enable live tests in CI.
@@ -131,13 +135,8 @@ Production before enabling live JEV. Both environments require Upstash, TypeSafe
 credentials and matching allowed origins. Deploy a preview, validate the integrated
 game/API, then promote after review. Mock mode is available without model access.
 
-## Screenshots
+## Art and audio
 
-Capture these from the integrated client before release:
-
-- Title screen and directive selection.
-- Split Path with both cooperative routes.
-- Consensus Engine overload phase.
-- Decision panel showing observation, probabilities and applied input.
-
-These are placeholders for actual gameplay captures.
+The checked-in pixel-art atlas is reproducible through the image-generation and
+post-processing pipeline in [ART.md](docs/ART.md). Procedural Web Audio unlocks
+from the Start button; music, effects and master volume are adjustable in Settings.

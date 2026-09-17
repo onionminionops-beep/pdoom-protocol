@@ -26,10 +26,19 @@ export function defaultSettings(reducedMotion = false): ClientSettings {
 }
 
 export function keyLabel(code: string): string {
-  return code.replace(/^Key/, "").replace(/^Digit/, "").replace("Arrow", "").replace("Left", " L").replace("Right", " R");
+  return code
+    .replace(/^Key/, "")
+    .replace(/^Digit/, "")
+    .replace("Arrow", "")
+    .replace("Left", " L")
+    .replace("Right", " R");
 }
 
-export function remapKey(bindings: KeyBindings, action: InputAction, code: string): KeyBindings | null {
+export function remapKey(
+  bindings: KeyBindings,
+  action: InputAction,
+  code: string,
+): KeyBindings | null {
   if (["Escape", "Tab", "Enter", "MetaLeft", "MetaRight"].includes(code)) return null;
   if (ACTIONS.some((other) => other !== action && bindings[other].includes(code))) return null;
   return { ...bindings, [action]: [code] };

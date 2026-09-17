@@ -10,48 +10,115 @@ const controllers: JevController[] = [];
 
 function harness(honorAbort = true) {
   const world = createWorld({
-    level: CONSENSUS_HEIGHTS, seed: 42, episodeId: "ep-test", directive: "SPEEDRUNNER",
+    level: CONSENSUS_HEIGHTS,
+    seed: 42,
+    episodeId: "ep-test",
+    directive: "SPEEDRUNNER",
     slots: { p1: "HUMAN", p2: "JEV" },
   });
   const requests: Array<{
-    url: string; init?: RequestInit; resolve: (response: Response) => void;
+    url: string;
+    init?: RequestInit;
+    resolve: (response: Response) => void;
   }> = [];
-  const fetcher = vi.fn<typeof fetch>((url, init) => new Promise((resolve, reject) => {
-    requests.push({ url: String(url), init, resolve });
-    if (honorAbort) init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
-  }));
+  const fetcher = vi.fn<typeof fetch>(
+    (url, init) =>
+      new Promise((resolve, reject) => {
+        requests.push({ url: String(url), init, resolve });
+        if (honorAbort)
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+      }),
+  );
   const onStatus = vi.fn();
-  const controller = new JevController({ fetch: fetcher, episodeId: world.episodeId, now: Date.now, onStatus });
+  const controller = new JevController({
+    fetch: fetcher,
+    episodeId: world.episodeId,
+    now: Date.now,
+    onStatus,
+  });
   controllers.push(controller);
   const update = (tick = world.tick) => {
     world.tick = tick;
-    return controller.update({ world, playerId: "p2", tick, episodeId: world.episodeId, nowMs: Date.now() });
+    return controller.update({
+      world,
+      playerId: "p2",
+      tick,
+      episodeId: world.episodeId,
+      nowMs: Date.now(),
+    });
   };
-  const replySession = (index = 0, requestBudget = 1200, expiresAt = Date.now() + 1800000, minDecisionIntervalMs?: number) => {
-    requests[index].resolve(Response.json({ sessionToken: "test-session-token", requestBudget, expiresAt, minDecisionIntervalMs }));
+  const replySession = (
+    index = 0,
+    requestBudget = 1200,
+    expiresAt = Date.now() + 1800000,
+    minDecisionIntervalMs?: number,
+  ) => {
+    requests[index].resolve(
+      Response.json({
+        sessionToken: "test-session-token",
+        requestBudget,
+        expiresAt,
+        minDecisionIntervalMs,
+      }),
+    );
   };
   const decision = (index = requests.length - 1): DecisionResponse => {
-    const { observation } = DecisionRequestSchema.parse(JSON.parse(String(requests[index].init?.body)));
+    const { observation } = DecisionRequestSchema.parse(
+      JSON.parse(String(requests[index].init?.body)),
+    );
     const answer = (choice: string) => ({ choice, confidence: 1, probabilities: { [choice]: 1 } });
     return {
-      requestId: `req-${index}`, episodeId: observation.episodeId, basedOnTick: observation.tick,
-      input: { ...neutralInput(observation.episodeId, observation.tick), horizontal: "right", shoot: true, holdForMs: 250 },
+      requestId: `req-${index}`,
+      episodeId: observation.episodeId,
+      basedOnTick: observation.tick,
+      input: {
+        ...neutralInput(observation.episodeId, observation.tick),
+        horizontal: "right",
+        shoot: true,
+        holdForMs: 250,
+      },
       answers: {
-        horizontal_input: answer("right"), vertical_action: answer("none"),
-        shoot_input: answer("true"), dash_input: answer("false"), interaction_input: answer("false"),
+        horizontal_input: answer("right"),
+        vertical_action: answer("none"),
+        shoot_input: answer("true"),
+        dash_input: answer("false"),
+        interaction_input: answer("false"),
         input_duration: answer("250"),
       },
       gated: { horizontal: false, vertical: false, shoot: false, dash: false, interact: false },
-      latencyMs: 20, model: "jev-test",
+      latencyMs: 20,
+      model: "jev-test",
     };
   };
-  const replyDecision = (data = decision(), index = requests.length - 1) => requests[index].resolve(Response.json(data));
+  const replyDecision = (data = decision(), index = requests.length - 1) =>
+    requests[index].resolve(Response.json(data));
   const replyError = (code = "upstream_unavailable", retryAfterMs?: number) => {
-    requests[requests.length - 1].resolve(Response.json({
-      error: code, message: "Unavailable", retryAfterMs,
-    }, { status: 503 }));
+    requests[requests.length - 1].resolve(
+      Response.json(
+        {
+          error: code,
+          message: "Unavailable",
+          retryAfterMs,
+        },
+        { status: 503 },
+      ),
+    );
   };
-  return { world, controller, onStatus, requests, update, replySession, replyDecision, replyError, decision };
+  return {
+    world,
+    controller,
+    onStatus,
+    requests,
+    update,
+    replySession,
+    replyDecision,
+    replyError,
+    decision,
+  };
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
@@ -70,7 +137,8 @@ describe("JevController", () => {
     const h = harness();
     expect(h.requests.map((r) => r.url)).toEqual(["/api/jev/session"]);
     expect(h.controller.getStatus().mode).toBe("connecting");
-    for (let tick = 0; tick < 10; tick++) expect(h.update(tick)).toEqual(neutralInput("ep-test", tick));
+    for (let tick = 0; tick < 10; tick++)
+      expect(h.update(tick)).toEqual(neutralInput("ep-test", tick));
     expect(h.requests).toHaveLength(1);
     h.replySession();
     await flush();
@@ -83,7 +151,11 @@ describe("JevController", () => {
     expect(h.requests).toHaveLength(2);
     h.replyDecision();
     await flush();
-    expect(h.controller.getStatus()).toMatchObject({ mode: "live", requestsSent: 1, consecutiveFailures: 0 });
+    expect(h.controller.getStatus()).toMatchObject({
+      mode: "live",
+      requestsSent: 1,
+      consecutiveFailures: 0,
+    });
     expect(h.onStatus).toHaveBeenLastCalledWith(h.controller.getStatus());
     expect(h.controller.getLastDecision()?.observation.tick).toBe(11);
   });
@@ -110,25 +182,28 @@ describe("JevController", () => {
     expect(h.requests).toHaveLength(3);
   });
 
-  it.each(["episode", "tick", "input-episode", "input-tick", "tick-age", "time-age"])("rejects a response with stale %s", async (kind) => {
-    const h = harness();
-    h.replySession();
-    await flush();
-    await vi.advanceTimersByTimeAsync(100);
-    h.update(10);
-    const response = h.decision();
-    if (kind === "episode") response.episodeId = "old-episode";
-    if (kind === "tick") response.basedOnTick = 9;
-    if (kind === "input-episode") response.input.episodeId = "old-episode";
-    if (kind === "input-tick") response.input.basedOnTick = 9;
-    if (kind === "tick-age") h.update(10 + AI_CONFIG.maxTickAgeTicks + 1);
-    if (kind === "time-age") await vi.advanceTimersByTimeAsync(AI_CONFIG.maxResponseAgeMs + 1);
-    h.replyDecision(response);
-    await flush();
-    expect(h.controller.getLastDecision()).toBeNull();
-    expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
-    expect(h.update().horizontal).toBe("neutral");
-  });
+  it.each(["episode", "tick", "input-episode", "input-tick", "tick-age", "time-age"])(
+    "rejects a response with stale %s",
+    async (kind) => {
+      const h = harness();
+      h.replySession();
+      await flush();
+      await vi.advanceTimersByTimeAsync(100);
+      h.update(10);
+      const response = h.decision();
+      if (kind === "episode") response.episodeId = "old-episode";
+      if (kind === "tick") response.basedOnTick = 9;
+      if (kind === "input-episode") response.input.episodeId = "old-episode";
+      if (kind === "input-tick") response.input.basedOnTick = 9;
+      if (kind === "tick-age") h.update(10 + AI_CONFIG.maxTickAgeTicks + 1);
+      if (kind === "time-age") await vi.advanceTimersByTimeAsync(AI_CONFIG.maxResponseAgeMs + 1);
+      h.replyDecision(response);
+      await flush();
+      expect(h.controller.getLastDecision()).toBeNull();
+      expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
+      expect(h.update().horizontal).toBe("neutral");
+    },
+  );
 
   it("ignores an old episode response even if transport ignores cancellation", async () => {
     const h = harness(false);
@@ -161,7 +236,8 @@ describe("JevController", () => {
       h.update(failure);
       h.replyError();
       await flush();
-      if (failure < AI_CONFIG.consecutiveFailuresBeforeMock) await vi.advanceTimersByTimeAsync(100 * 2 ** failure);
+      if (failure < AI_CONFIG.consecutiveFailuresBeforeMock)
+        await vi.advanceTimersByTimeAsync(100 * 2 ** failure);
     }
     expect(h.controller.getStatus().mode).toBe("fallback_mock");
     const count = h.requests.length;
@@ -175,7 +251,11 @@ describe("JevController", () => {
     expect(h.controller.getStatus().mode).toBe("fallback_mock");
     h.replyDecision();
     await flush();
-    expect(h.controller.getStatus()).toMatchObject({ mode: "live", consecutiveFailures: 0, lastError: null });
+    expect(h.controller.getStatus()).toMatchObject({
+      mode: "live",
+      consecutiveFailures: 0,
+      lastError: null,
+    });
     expect(h.update().horizontal).toBe("right");
   });
 
@@ -205,7 +285,10 @@ describe("JevController", () => {
     await flush();
     await vi.advanceTimersByTimeAsync(250);
     h.update(1);
-    expect(h.controller.getStatus()).toMatchObject({ mode: "fallback_mock", lastError: "session_budget_exhausted" });
+    expect(h.controller.getStatus()).toMatchObject({
+      mode: "fallback_mock",
+      lastError: "session_budget_exhausted",
+    });
     expect(h.requests).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(650);
     h.update(2);
@@ -258,11 +341,15 @@ describe("JevController", () => {
       h.replyDecision();
       await flush();
       expect(h.controller.getStatus()).toMatchObject({
-        mode: "live", minDecisionIntervalMs: 550, lastRoundTripMs: 150,
+        mode: "live",
+        minDecisionIntervalMs: 550,
+        lastRoundTripMs: 150,
       });
       expect(h.update().horizontal).toBe("right");
       await vi.advanceTimersByTimeAsync(251);
-      expect(h.update(Math.floor((elapsed + 401) * 0.06))).toEqual(neutralInput("ep-test", h.world.tick));
+      expect(h.update(Math.floor((elapsed + 401) * 0.06))).toEqual(
+        neutralInput("ep-test", h.world.tick),
+      );
       await vi.advanceTimersByTimeAsync(148);
       h.update(Math.floor((elapsed + 549) * 0.06));
       expect(h.requests).toHaveLength(sent.length + 1);
@@ -301,27 +388,34 @@ describe("JevController", () => {
     expect(h.controller.getStatus().mode).toBe("waiting");
   });
 
-  it.each([100, 150, 200, 250] as const)("expires a received action after its %s ms hold without filling gaps with mock input", async (holdForMs) => {
-    const h = harness();
-    h.replySession(0, 1200, Date.now() + 1800000, 550);
-    await flush();
-    await vi.advanceTimersByTimeAsync(100);
-    h.update(6);
-    await vi.advanceTimersByTimeAsync(450);
-    h.update(33);
-    const result = h.decision();
-    result.input.holdForMs = holdForMs;
-    h.replyDecision(result);
-    await flush();
-    expect(h.controller.getStatus()).toMatchObject({ mode: "live", lastRoundTripMs: 450, lastLatencyMs: 20 });
-    expect(h.update().horizontal).toBe("right");
-    await vi.advanceTimersByTimeAsync(holdForMs - 1);
-    expect(h.update(33 + Math.floor((holdForMs - 1) * 0.06)).horizontal).toBe("right");
-    await vi.advanceTimersByTimeAsync(1);
-    expect(h.update()).toEqual(neutralInput("ep-test", h.world.tick));
-    expect(h.requests).toHaveLength(3);
-    expect(h.controller.getStatus().mode).toBe("waiting");
-  });
+  it.each([100, 150, 200, 250] as const)(
+    "expires a received action after its %s ms hold without filling gaps with mock input",
+    async (holdForMs) => {
+      const h = harness();
+      h.replySession(0, 1200, Date.now() + 1800000, 550);
+      await flush();
+      await vi.advanceTimersByTimeAsync(100);
+      h.update(6);
+      await vi.advanceTimersByTimeAsync(450);
+      h.update(33);
+      const result = h.decision();
+      result.input.holdForMs = holdForMs;
+      h.replyDecision(result);
+      await flush();
+      expect(h.controller.getStatus()).toMatchObject({
+        mode: "live",
+        lastRoundTripMs: 450,
+        lastLatencyMs: 20,
+      });
+      expect(h.update().horizontal).toBe("right");
+      await vi.advanceTimersByTimeAsync(holdForMs - 1);
+      expect(h.update(33 + Math.floor((holdForMs - 1) * 0.06)).horizontal).toBe("right");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(h.update()).toEqual(neutralInput("ep-test", h.world.tick));
+      expect(h.requests).toHaveLength(3);
+      expect(h.controller.getStatus().mode).toBe("waiting");
+    },
+  );
 
   it("adapts above the pacing floor for a slow response without overlapping requests", async () => {
     const h = harness();
@@ -360,26 +454,32 @@ describe("JevController", () => {
     await flush();
     await vi.advanceTimersByTimeAsync(550);
     h.update(72);
-    expect(h.controller.getStatus()).toMatchObject({ mode: "fallback_mock", lastError: "session_budget_exhausted" });
+    expect(h.controller.getStatus()).toMatchObject({
+      mode: "fallback_mock",
+      lastError: "session_budget_exhausted",
+    });
     await vi.advanceTimersByTimeAsync(60000);
     h.update(3672);
     expect(h.requests).toHaveLength(3);
     expect(h.requests.filter((r) => r.url === "/api/jev/session")).toHaveLength(1);
   });
 
-  it.each(["wall-clock", "tick"] as const)("never extends observation freshness after receipt (%s cap)", async (cap) => {
-    const h = harness();
-    h.replySession(0, 1200, Date.now() + 1800000, 550);
-    await flush();
-    await vi.advanceTimersByTimeAsync(100);
-    h.update(6);
-    await vi.advanceTimersByTimeAsync(700);
-    h.update(48);
-    h.replyDecision();
-    await flush();
-    expect(h.update().shoot).toBe(true);
-    if (cap === "wall-clock") await vi.advanceTimersByTimeAsync(51);
-    expect(h.update(cap === "tick" ? 52 : 51)).toEqual(neutralInput("ep-test", h.world.tick));
-    expect(h.controller.getLastDecision()?.basedOnTick).toBe(6);
-  });
+  it.each(["wall-clock", "tick"] as const)(
+    "never extends observation freshness after receipt (%s cap)",
+    async (cap) => {
+      const h = harness();
+      h.replySession(0, 1200, Date.now() + 1800000, 550);
+      await flush();
+      await vi.advanceTimersByTimeAsync(100);
+      h.update(6);
+      await vi.advanceTimersByTimeAsync(700);
+      h.update(48);
+      h.replyDecision();
+      await flush();
+      expect(h.update().shoot).toBe(true);
+      if (cap === "wall-clock") await vi.advanceTimersByTimeAsync(51);
+      expect(h.update(cap === "tick" ? 52 : 51)).toEqual(neutralInput("ep-test", h.world.tick));
+      expect(h.controller.getLastDecision()?.basedOnTick).toBe(6);
+    },
+  );
 });

@@ -424,11 +424,12 @@ when regeneration is explicitly requested with `UPDATE_CONTRACTS=1`.
 
 ### SessionResponseSchema
 
-| Field           | Required | Type / constraints                                     |
-| --------------- | -------- | ------------------------------------------------------ |
-| `sessionToken`  | yes      | `string`                                               |
-| `expiresAt`     | yes      | `number`                                               |
-| `requestBudget` | yes      | `integer; min=-9007199254740991; max=9007199254740991` |
+| Field                   | Required | Type / constraints                                     |
+| ----------------------- | -------- | ------------------------------------------------------ |
+| `sessionToken`          | yes      | `string`                                               |
+| `expiresAt`             | yes      | `number`                                               |
+| `requestBudget`         | yes      | `integer; min=-9007199254740991; max=9007199254740991` |
+| `minDecisionIntervalMs` | no       | `integer; max=9007199254740991`                        |
 
 ### ApiErrorSchema
 

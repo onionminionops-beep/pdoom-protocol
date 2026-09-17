@@ -61,17 +61,19 @@ The configured quotas count **requests**, not provider input/output tokens or
 currency. Observation limits and body caps bound input size; `usage` is telemetry,
 not a separate token-spend budget.
 
-The default IP quota permits less traffic than the controller's 100 ms minimum
-decision interval. Rate denials cause backoff and may cause Mock fallback. Budget
-changes must be considered with cadence and cost, not presented as unlimited live
-play. Server timeout, browser timeout and response freshness are distinct controls.
-The client accepts observations no older than 400 ms and 45 ticks; four consecutive
+The server advertises a 550 ms decision interval under the default IP quota,
+including headroom below 120 requests/minute. The client preserves that floor on
+successes and retries; requested 100–250 ms holds expire without filling the gaps.
+Server timeout, browser timeout and response freshness are distinct controls.
+The client accepts observations no older than 750 ms and 45 ticks; four consecutive
 failures activate Mock fallback, with live retries every 15 seconds.
 
 ## Storage and network configuration
 
 Set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for production and
-deployed runtimes. Partial configuration, Redis errors and limiter timeouts fail
+deployed runtimes, or connect Vercel Marketplace's Upstash integration, which supplies
+`KV_REST_API_URL` and `KV_REST_API_TOKEN`. An explicit Upstash pair takes precedence;
+credentials from different pairs are never mixed. Partial configuration, Redis errors and limiter timeouts fail
 closed. Production, unknown/unset modes, `VERCEL=1`, or
 `VERCEL_ENV=production|preview` reject missing shared storage with a typed
 `misconfigured` 503 before issuing tokens or contacting TypeSafe.

@@ -32,7 +32,16 @@ export interface SpriteSheetDef {
 
 export type CharacterSheetKey = "user" | "jev";
 export type EnemySheetKey = EnemyType;
-export type PropSheetKey = "coin" | "health" | "ammo" | "fact_check" | "weapon_crate" | "switch" | "exit" | "projectiles" | "fx";
+export type PropSheetKey =
+  | "coin"
+  | "health"
+  | "ammo"
+  | "fact_check"
+  | "weapon_crate"
+  | "switch"
+  | "exit"
+  | "projectiles"
+  | "fx";
 export type TilesetKey = "tiles";
 export type BackdropKey = "bg_far" | "bg_mid" | "bg_near";
 
@@ -42,7 +51,23 @@ export interface ArtManifest {
   characters: Record<CharacterSheetKey, SpriteSheetDef>;
   enemies: Record<EnemySheetKey, SpriteSheetDef>;
   props: Record<PropSheetKey, SpriteSheetDef>;
-  tileset: { key: TilesetKey; file: string; tileSize: 32; columns: number; tiles: Record<"solid" | "oneway" | "hazard" | "gate" | "solid_top" | "solid_left" | "solid_right" | "solid_inner", number[]> };
+  tileset: {
+    key: TilesetKey;
+    file: string;
+    tileSize: 32;
+    columns: number;
+    tiles: Record<
+      | "solid"
+      | "oneway"
+      | "hazard"
+      | "gate"
+      | "solid_top"
+      | "solid_left"
+      | "solid_right"
+      | "solid_inner",
+      number[]
+    >;
+  };
   backdrops: Record<BackdropKey, { file: string; width: number; height: number; parallax: number }>;
   billboards: { file: string; frameWidth: number; frameHeight: number; count: number };
   ui: { font: string; portraitUser: string; portraitJev: string; logo: string };
@@ -66,7 +91,16 @@ export const PLAYER_ANIMS: PlayerAnim[] = [
   "death",
 ];
 
-export const ENEMY_ANIMS = ["idle", "move", "telegraph", "attack", "recover", "hurt", "dying", "special"] as const;
+export const ENEMY_ANIMS = [
+  "idle",
+  "move",
+  "telegraph",
+  "attack",
+  "recover",
+  "hurt",
+  "dying",
+  "special",
+] as const;
 
 export const PLAYER_FRAME = { w: 32, h: 48 } as const;
 export const ART_MANIFEST_URL = "/art/manifest.json";
