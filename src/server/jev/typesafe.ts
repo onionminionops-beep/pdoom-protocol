@@ -29,7 +29,7 @@ const BASE_INSTRUCTIONS: Record<QuestionId, string> = {
   interaction_input:
     "Should JEV hold interact for the next interval? Prefer an in-range required switch, gate-opening objective, weapon/ammo opportunity, or safe revive. The choice is independent of the other questions.",
   input_duration:
-    "Choose how long to hold these independently selected buttons before reconsidering: 100, 150, 200, or 250 milliseconds. Use short intervals for danger, gates, gaps, or platforming and longer intervals for stable travel.",
+    "Choose how long to hold these independently selected buttons before reconsidering: 100, 150, 200, or 250 milliseconds. A jump toward a higher platform needs 250 ms and repeated jump holds while rising; use shorter intervals only when releasing is intentional or danger requires it.",
 };
 
 export function buildQuestions(obs: GameObservationV1) {
@@ -72,7 +72,8 @@ export function buildQuestions(obs: GameObservationV1) {
       "100": "Reconsider quickly for danger, a gap, a gate, or precise platforming.",
       "150": "Use a short controlled interval while approaching a changing local situation.",
       "200": "Use a moderate interval when the route and danger are stable.",
-      "250": "Use the longest interval only for stable unobstructed travel.",
+      "250":
+        "Use for a full-height jump or higher platform; it is also suitable for stable unobstructed travel.",
     }),
   } satisfies Record<QuestionId, Questions[string]>;
 }
