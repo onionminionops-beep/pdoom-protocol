@@ -1,7 +1,7 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import { validateJevStorage, type JevConfig } from "./config";
+import { jevLimitsDisabled, validateJevStorage, type JevConfig } from "./config";
 import { JevApiError } from "./errors";
 import type { SessionClaims } from "./session";
 
@@ -47,6 +47,7 @@ export class MemoryJevLimits implements JevLimits {
     for (const [id, window] of this.windows) {
       if (!window.length || window[window.length - 1] <= now - 60000) this.windows.delete(id);
     }
+    if (jevLimitsDisabled()) return;
     const key = `${issuingSession ? "session" : "decision"}:${ip}`;
     const window = (this.windows.get(key) ?? []).filter((t) => t > now - 60000);
     const limit = issuingSession ? this.config.sessionsPerMinute : this.config.ipPerMinute;
@@ -65,18 +66,20 @@ export class MemoryJevLimits implements JevLimits {
     if (!entry || entry.session.episodeId !== session.episodeId || entry.session.expiresAt <= now)
       invalidSession();
     if (tick <= entry.tick) staleTick();
-    if (entry.used >= Math.min(session.budget, entry.session.budget))
-      denied("session_budget_exhausted");
-    const day = Math.floor(now / DAY_MS);
-    if (this.day !== day) {
-      this.day = day;
-      this.dailyUsed = 0;
+    if (!jevLimitsDisabled()) {
+      if (entry.used >= Math.min(session.budget, entry.session.budget))
+        denied("session_budget_exhausted");
+      const day = Math.floor(now / DAY_MS);
+      if (this.day !== day) {
+        this.day = day;
+        this.dailyUsed = 0;
+      }
+      if (this.dailyUsed >= this.config.dailyBudget)
+        denied("global_budget_exhausted", (day + 1) * DAY_MS - now);
+      this.dailyUsed++;
     }
-    if (this.dailyUsed >= this.config.dailyBudget)
-      denied("global_budget_exhausted", (day + 1) * DAY_MS - now);
     entry.tick = tick;
     entry.used++;
-    this.dailyUsed++;
   }
 }
 
@@ -85,7 +88,7 @@ if redis.call("EXISTS", KEYS[1]) == 0 then return -1 end
 local data = redis.call("HMGET", KEYS[1], "episode", "expires", "tick", "used", "budget")
 if data[1] ~= ARGV[1] or tonumber(data[2]) <= tonumber(ARGV[3]) then return -1 end
 if tonumber(ARGV[2]) <= tonumber(data[3]) then return -2 end
-if tonumber(data[4]) >= math.min(tonumber(data[5]), tonumber(ARGV[4])) then return -3 end
+if ARGV[5] ~= "1" and tonumber(data[4]) >= math.min(tonumber(data[5]), tonumber(ARGV[4])) then return -3 end
 redis.call("HSET", KEYS[1], "tick", ARGV[2])
 redis.call("HINCRBY", KEYS[1], "used", 1)
 return 1
@@ -132,6 +135,7 @@ export class RedisJevLimits implements JevLimits {
   }
 
   async limitIp(ip: string, issuingSession: boolean): Promise<void> {
+    if (jevLimitsDisabled()) return;
     await this.check(issuingSession ? this.issuance : this.ip, ip, "rate_limited");
   }
 
@@ -150,17 +154,18 @@ export class RedisJevLimits implements JevLimits {
   }
 
   async claim(session: SessionClaims, tick: number): Promise<void> {
+    const disabled = jevLimitsDisabled();
     const result = await this.redis.eval<(string | number)[], number>(
       CLAIM_SCRIPT,
       [`jev:session:${session.id}`],
-      [session.episodeId, tick, Date.now(), session.budget],
+      [session.episodeId, tick, Date.now(), session.budget, disabled ? 1 : 0],
     );
     if (result === -1) invalidSession();
     if (result === -2) staleTick();
     if (result === -3) denied("session_budget_exhausted");
     if (result !== 1)
       throw new JevApiError("upstream_unavailable", 503, "Jev storage is unavailable.");
-    await this.check(this.daily, "all", "global_budget_exhausted");
+    if (!disabled) await this.check(this.daily, "all", "global_budget_exhausted");
   }
 }
 

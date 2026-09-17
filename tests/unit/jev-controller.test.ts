@@ -53,7 +53,7 @@ function harness(honorAbort = true) {
   };
   const replySession = (
     index = 0,
-    requestBudget = 1200,
+    requestBudget: number | null = 1200,
     expiresAt = Date.now() + 1800000,
     minDecisionIntervalMs?: number,
   ) => {
@@ -293,6 +293,52 @@ describe("JevController", () => {
     await vi.advanceTimersByTimeAsync(650);
     h.update(2);
     expect(h.requests[2].url).toBe("/api/jev/session");
+  });
+
+  it("accepts null budgets, uses the 100 ms floor beyond 1200 decisions and still renews on expiry", async () => {
+    const h = harness();
+    const expiresAt = Date.now() + 1800000;
+    h.replySession(0, null, expiresAt, 100);
+    await flush();
+    for (let i = 1; i <= 1205; i++) {
+      await vi.advanceTimersByTimeAsync(100);
+      h.update(i * 6);
+      expect(h.requests).toHaveLength(i + 1);
+      h.update(i * 6 + 1);
+      expect(h.requests).toHaveLength(i + 1);
+      const result = h.decision();
+      result.input.holdForMs = 100;
+      result.answers.input_duration = {
+        choice: "100",
+        confidence: 1,
+        probabilities: { "100": 1 },
+      };
+      h.replyDecision(result);
+      await flush();
+      expect(h.controller.getStatus()).toMatchObject({
+        mode: "live",
+        minDecisionIntervalMs: 100,
+        consecutiveFailures: 0,
+      });
+    }
+    expect(h.requests.filter((r) => r.url === "/api/jev/session")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(expiresAt - Date.now());
+    h.update(108000);
+    expect(h.requests.filter((r) => r.url === "/api/jev/session")).toHaveLength(2);
+  });
+
+  it.each([0, -1])("still rejects a nonpositive numeric session budget: %s", async (budget) => {
+    const h = harness();
+    h.replySession(0, budget);
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
+  });
+
+  it("rejects an expired session even with a null budget", async () => {
+    const h = harness();
+    h.replySession(0, null, Date.now());
+    await flush();
+    expect(h.controller.getStatus()).toMatchObject({ mode: "error", consecutiveFailures: 1 });
   });
 
   it("aborts timed out requests and ignores responses after disposal", async () => {

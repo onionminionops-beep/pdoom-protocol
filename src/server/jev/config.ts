@@ -2,6 +2,10 @@ import "server-only";
 import { AI_CONFIG } from "@/game/config/ai";
 import { JevApiError } from "./errors";
 
+export function jevLimitsDisabled(): boolean {
+  return process.env.JEV_DISABLE_LIMITS === "1" && process.env.VERCEL_ENV === "preview";
+}
+
 function positiveInteger(name: string, fallback: number): number {
   const value = process.env[name];
   if (!value) return fallback;

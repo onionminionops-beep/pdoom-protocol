@@ -177,7 +177,10 @@ export class JevController implements PlayerController {
         await this.post("/api/jev/session", { episodeId: this.episodeId }),
       );
       if (this.disposed || generation !== this.generation) return;
-      if (session.expiresAt <= Date.now() || session.requestBudget <= 0)
+      if (
+        session.expiresAt <= Date.now() ||
+        (session.requestBudget !== null && session.requestBudget <= 0)
+      )
         throw new Error("Invalid session");
       this.session = session;
       this.sessionExpiresAt = this.now() + (session.expiresAt - Date.now());
@@ -266,7 +269,10 @@ export class JevController implements PlayerController {
       if (this.session && now >= this.sessionExpiresAt) this.session = null;
       if (!this.session) {
         void this.connect();
-      } else if (this.sessionRequests >= this.session.requestBudget) {
+      } else if (
+        this.session.requestBudget !== null &&
+        this.sessionRequests >= this.session.requestBudget
+      ) {
         this.fallback = true;
         this.nextRequestAt = this.sessionExpiresAt;
         this.publish({ mode: "fallback_mock", lastError: "session_budget_exhausted" });
