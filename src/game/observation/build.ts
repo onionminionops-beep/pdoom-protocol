@@ -18,10 +18,10 @@ import {
 import { otherPlayerId } from "../sim/player";
 import type { EnemyState, PlayerId, PlayerState, ProjectileState, WorldState } from "../sim/types";
 import { INTERACT_RANGE_PX, REVIVE_RANGE_PX } from "../sim/step";
-import { roomAt, visibleFrom } from "../sim/visibility";
+import { roomAt } from "../sim/visibility";
+import { cameraContains, fitCamera } from "../view/camera";
 
 const HAZARD_CHECK_MAX = 400;
-const WALL_PROBE = 160;
 
 /**
  * Builds the observation JEV (or the mock) receives. Only facts a player
@@ -42,14 +42,23 @@ export function buildObservation(
   const weapon = WEAPONS[self.weapon];
   const hh = MOVEMENT.bodyHeight / 2;
   const hw = MOVEMENT.bodyWidth / 2;
+  const camera = fitCamera(world);
 
   const rel = (p: { x: number; y: number }) => ({ x: p.x - self.pos.x, y: p.y - self.pos.y });
 
   // ---- terrain
   const groundBelowD = distanceToGround(level, self.pos.x, self.pos.y + hh, 600);
   const ceilingD = distanceToCeiling(level, self.pos.x, self.pos.y - hh, 300);
-  const leftWall = distanceToWall(level, self.pos.x - hw, self.pos.y, -1, WALL_PROBE);
-  const rightWall = distanceToWall(level, self.pos.x + hw, self.pos.y, 1, WALL_PROBE);
+  const leftWallScanPx = Math.max(0, Math.min(self.pos.x - hw - camera.x, self.pos.x - hw - 1));
+  const rightWallScanPx = Math.max(
+    0,
+    Math.min(
+      camera.x + camera.width - (self.pos.x + hw),
+      level.widthTiles * TILE - self.pos.x - hw - 1,
+    ),
+  );
+  const leftWall = distanceToWall(level, self.pos.x - hw, self.pos.y, -1, leftWallScanPx);
+  const rightWall = distanceToWall(level, self.pos.x + hw, self.pos.y, 1, rightWallScanPx);
   const safeLandingLeft = landingSafe(world, self.pos.x - TILE * 1.5, self.pos.y + hh);
   const safeLandingRight = landingSafe(world, self.pos.x + TILE * 1.5, self.pos.y + hh);
   const nearLeftEdge = self.grounded && !hasGroundAt(world, self.pos.x - hw - 4, self.pos.y + hh);
@@ -60,7 +69,13 @@ export function buildObservation(
 
   // ---- enemies
   const enemies: ObservedEnemy[] = world.enemies
-    .filter((e) => e.health > 0 && e.phase !== "dying" && visibleFrom(level, self.pos, e.pos))
+    .filter(
+      (e) =>
+        e.roomId === room.id &&
+        e.health > 0 &&
+        e.phase !== "dying" &&
+        cameraContains(camera, e.pos),
+    )
     .map((e) => describeEnemy(world, self, e, weapon.rangePx))
     .filter((e) => e.distance < 900)
     .sort(
@@ -73,7 +88,7 @@ export function buildObservation(
 
   // ---- projectiles
   const hostileProjectiles: ObservedProjectile[] = world.projectiles
-    .filter((p) => p.ownerKind === "enemy" && visibleFrom(level, self.pos, p.pos))
+    .filter((p) => p.ownerKind === "enemy" && cameraContains(camera, p.pos))
     .map((p) => describeProjectile(self, p))
     .filter((p) => Math.hypot(p.relativePosition.x, p.relativePosition.y) < 520)
     .sort((a, b) => {
@@ -91,7 +106,7 @@ export function buildObservation(
 
   // ---- pickups
   const pickups = world.pickups
-    .filter((p) => !p.collected && visibleFrom(level, self.pos, p.pos))
+    .filter((p) => p.roomId === room.id && !p.collected && cameraContains(camera, p.pos))
     .map((p) => {
       const r = rel(p.pos);
       return {
@@ -114,8 +129,9 @@ export function buildObservation(
     .filter((it) => !(it.type === "weapon_crate" && it.activated))
     .filter(
       (it) =>
+        it.roomId === room.id &&
         (!it.requiredPlayer || it.requiredPlayer === selfId) &&
-        visibleFrom(level, self.pos, it.pos),
+        cameraContains(camera, it.pos),
     )
     .map((it) => {
       const r = rel(it.pos);
@@ -184,7 +200,7 @@ export function buildObservation(
     timestampMs,
     rules: {
       units: "distance px; velocity px/s; time ms; tile 32 px",
-      coordinates: "+x right, +y down; relative positions use self center",
+      coordinates: "+x right, +y down; course left-to-right; relative positions use self center",
       movement: {
         bodyWidthPx: MOVEMENT.bodyWidth,
         bodyHeightPx: MOVEMENT.bodyHeight,
@@ -196,8 +212,8 @@ export function buildObservation(
         maxRisePx: Math.round(
           (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity),
         ),
-        approximateHorizontalReachPx: Math.round(
-          MOVEMENT.runSpeed * (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity),
+        approximateSameHeightReachPx: Math.round(
+          (MOVEMENT.runSpeed * (2 * Math.abs(MOVEMENT.jumpVelocity))) / MOVEMENT.gravity,
         ),
         approximateFullHoldMs: Math.ceil(
           (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) * 1000,
@@ -272,10 +288,12 @@ export function buildObservation(
       safeLandingRight,
       jumpWouldReachPlatform,
       dropIsSafe,
-      platforms: describePlatforms(world, self),
-      nextObstruction: describeNextObstruction(world, self, leftWall, rightWall),
+      leftWallScan: leftWallScanPx,
+      rightWallScan: rightWallScanPx,
+      platforms: describePlatforms(world, self, camera),
+      nextObstruction: describeNextObstruction(world, self, camera, leftWall, rightWall),
     },
-    progression: describeProgression(world, self, room),
+    progression: describeProgression(world, self, room, camera),
     enemies,
     hostileProjectiles,
     pickups,
@@ -304,6 +322,7 @@ export function buildObservation(
 function describePlatforms(
   world: Readonly<WorldState>,
   self: PlayerState,
+  camera: ReturnType<typeof fitCamera>,
 ): Array<{
   id: string;
   relativeLeftX: number;
@@ -313,10 +332,16 @@ function describePlatforms(
   horizontalGapPx: number;
   reachableByJumpEstimate: boolean;
 }> {
-  const minTx = Math.max(0, Math.floor((self.pos.x - 480) / TILE));
-  const maxTx = Math.min(world.level.widthTiles - 1, Math.floor((self.pos.x + 480) / TILE));
-  const minTy = Math.max(1, Math.floor((self.pos.y - 270) / TILE));
-  const maxTy = Math.min(world.level.heightTiles - 1, Math.floor((self.pos.y + 270) / TILE));
+  const minTx = Math.max(0, Math.floor(camera.x / TILE));
+  const maxTx = Math.min(
+    world.level.widthTiles - 1,
+    Math.ceil((camera.x + camera.width) / TILE) - 1,
+  );
+  const minTy = Math.max(1, Math.floor(camera.y / TILE));
+  const maxTy = Math.min(
+    world.level.heightTiles - 1,
+    Math.ceil((camera.y + camera.height) / TILE) - 1,
+  );
   const platforms: Array<{
     id: string;
     relativeLeftX: number;
@@ -350,10 +375,11 @@ function describePlatforms(
   return platforms
     .sort(
       (a, b) =>
+        Number(b.reachableByJumpEstimate) - Number(a.reachableByJumpEstimate) ||
         a.horizontalGapPx - b.horizontalGapPx ||
+        Math.abs(a.relativeTopY) - Math.abs(b.relativeTopY) ||
         Math.abs(a.relativeLeftX + a.relativeRightX) -
           Math.abs(b.relativeLeftX + b.relativeRightX) ||
-        a.relativeTopY - b.relativeTopY ||
         a.id.localeCompare(b.id),
     )
     .slice(0, 2);
@@ -365,6 +391,8 @@ function describePlatforms(
     const rightX = end * TILE;
     const topY = ty * TILE;
     const maxRise = (MOVEMENT.jumpVelocity * MOVEMENT.jumpVelocity) / (2 * MOVEMENT.gravity);
+    const sameHeightReach =
+      (MOVEMENT.runSpeed * (2 * Math.abs(MOVEMENT.jumpVelocity))) / MOVEMENT.gravity;
     const bodyLeft = self.pos.x - MOVEMENT.bodyWidth / 2;
     const bodyRight = self.pos.x + MOVEMENT.bodyWidth / 2;
     const horizontalGapPx = Math.max(0, Math.max(bodyLeft - rightX, leftX - bodyRight));
@@ -376,10 +404,9 @@ function describePlatforms(
       relativeTopY: topY - self.pos.y,
       surface,
       reachableByJumpEstimate:
-        self.pos.y + MOVEMENT.bodyHeight / 2 - topY <= maxRise + TILE &&
-        (horizontalGapPx <=
-          MOVEMENT.runSpeed * (Math.abs(MOVEMENT.jumpVelocity) / MOVEMENT.gravity) ||
-          nearestEdgeDistance <= MOVEMENT.bodyWidth),
+        self.pos.y + MOVEMENT.bodyHeight / 2 - topY >= 0 &&
+        self.pos.y + MOVEMENT.bodyHeight / 2 - topY <= maxRise &&
+        (horizontalGapPx <= sameHeightReach || nearestEdgeDistance <= MOVEMENT.bodyWidth),
       horizontalGapPx,
     });
   }
@@ -388,6 +415,7 @@ function describePlatforms(
 function describeNextObstruction(
   world: Readonly<WorldState>,
   self: PlayerState,
+  camera: ReturnType<typeof fitCamera>,
   leftWall: number | null,
   rightWall: number | null,
 ): {
@@ -395,33 +423,46 @@ function describeNextObstruction(
   distancePx: number;
   type: "wall" | "closed_gate";
 } | null {
-  const candidates = [
-    leftWall === null ? null : { side: "left" as const, distancePx: leftWall },
-    rightWall === null ? null : { side: "right" as const, distancePx: rightWall },
-  ].filter(
-    (candidate): candidate is { side: "left" | "right"; distancePx: number } => candidate !== null,
-  );
+  const candidates: Array<{
+    side: "left" | "right";
+    distancePx: number;
+    type: "wall" | "closed_gate";
+  }> = [
+    self.facing !== "left" || leftWall === null
+      ? null
+      : { side: "left" as const, distancePx: leftWall, type: "wall" as const },
+    self.facing !== "right" || rightWall === null
+      ? null
+      : { side: "right" as const, distancePx: rightWall, type: "wall" as const },
+  ].filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null);
   const room = roomAt(world.level, self.pos) ?? world.level.rooms[0];
   const gateX = room?.gateTileX;
   if (gateX !== null && gateX !== undefined && !world.openedGates[room.id]) {
-    const gateDistance = Math.abs((gateX + 0.5) * TILE - self.pos.x) - MOVEMENT.bodyWidth / 2;
-    if (gateDistance >= 0 && gateDistance <= 480) {
-      return {
-        side: gateX * TILE + TILE / 2 >= self.pos.x ? "right" : "left",
+    const gateIsRight = gateX * TILE >= self.pos.x;
+    const gateDistance = gateIsRight
+      ? gateX * TILE - (self.pos.x + MOVEMENT.bodyWidth / 2)
+      : self.pos.x - MOVEMENT.bodyWidth / 2 - (gateX + 1) * TILE;
+    if (
+      gateDistance >= 0 &&
+      gateDistance <= (gateIsRight ? camera.x + camera.width - self.pos.x : self.pos.x - camera.x)
+    ) {
+      candidates.push({
+        side: gateIsRight ? "right" : "left",
         distancePx: Math.max(0, gateDistance),
         type: "closed_gate",
-      };
+      });
     }
   }
   if (candidates.length === 0) return null;
   const nearest = candidates.sort((a, b) => a.distancePx - b.distancePx)[0];
-  return { ...nearest, type: "wall" };
+  return nearest;
 }
 
 function describeProgression(
   world: Readonly<WorldState>,
   self: PlayerState,
   room: NonNullable<ReturnType<typeof roomAt>>,
+  camera: ReturnType<typeof fitCamera>,
 ) {
   const roomIndex = Math.max(
     0,
@@ -432,14 +473,14 @@ function describeProgression(
       enemy.roomId === room.id &&
       enemy.health > 0 &&
       enemy.phase !== "dying" &&
-      visibleFrom(world.level, self.pos, enemy.pos),
+      cameraContains(camera, enemy.pos),
   ).length;
   const visibleUnactivatedSwitches = world.interactables.filter(
     (interactable) =>
       interactable.type === "switch" &&
       interactable.roomId === room.id &&
       !interactable.activated &&
-      visibleFrom(world.level, self.pos, interactable.pos),
+      cameraContains(camera, interactable.pos),
   ).length;
   const gate =
     room.gateTileX === null
@@ -455,15 +496,19 @@ function describeProgression(
           visibleUnactivatedSwitches,
         };
   const blockedReason =
-    !world.openedGates[room.id] && room.gateOnEnemies && visibleRemainingEnemies > 0
-      ? `Clear ${visibleRemainingEnemies} visible room enem${
-          visibleRemainingEnemies === 1 ? "y" : "ies"
-        }; hidden room state is unknown.`
-      : !world.openedGates[room.id] && !room.gateOnEnemies && visibleUnactivatedSwitches > 0
-        ? `Activate the ${visibleUnactivatedSwitches} visible unactivated switch${
-            visibleUnactivatedSwitches === 1 ? "" : "es"
-          }; other switch state is unknown.`
-        : null;
+    world.openedGates[room.id] || room.gateTileX === null
+      ? null
+      : room.gateOnEnemies
+        ? visibleRemainingEnemies > 0
+          ? `Clear ${visibleRemainingEnemies} visible room enem${
+              visibleRemainingEnemies === 1 ? "y" : "ies"
+            }; hidden room state is unknown.`
+          : "Gate closed; clear enemies; visible remainder is unknown."
+        : visibleUnactivatedSwitches > 0
+          ? `Activate the ${visibleUnactivatedSwitches} visible unactivated switch${
+              visibleUnactivatedSwitches === 1 ? "" : "es"
+            }; other switch state is unknown.`
+          : "Gate closed; activate switches; visible remainder is unknown.";
   return {
     roomId: room.id,
     roomIndex,

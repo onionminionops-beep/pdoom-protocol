@@ -13,7 +13,9 @@ export type WeaponId = z.infer<typeof WeaponIdSchema>;
 
 const RulesSchema = z.object({
   units: z.literal("distance px; velocity px/s; time ms; tile 32 px"),
-  coordinates: z.literal("+x right, +y down; relative positions use self center"),
+  coordinates: z.literal(
+    "+x right, +y down; course left-to-right; relative positions use self center",
+  ),
   movement: z.object({
     bodyWidthPx: z.number().positive(),
     bodyHeightPx: z.number().positive(),
@@ -23,7 +25,7 @@ const RulesSchema = z.object({
     jumpVelocityPxPerS: z.number(),
     gravityPxPerS2: z.number().positive(),
     maxRisePx: z.number().nonnegative(),
-    approximateHorizontalReachPx: z.number().positive(),
+    approximateSameHeightReachPx: z.number().positive(),
     approximateFullHoldMs: z.number().positive(),
     minimumHoldMs: z.number().positive(),
   }),
@@ -172,6 +174,8 @@ export const GameObservationV1Schema = z.object({
     safeLandingRight: z.boolean(),
     jumpWouldReachPlatform: z.boolean(),
     dropIsSafe: z.boolean(),
+    leftWallScan: z.number().nonnegative(),
+    rightWallScan: z.number().nonnegative(),
     platforms: z.array(PlatformSchema).max(2),
     nextObstruction: z
       .object({
@@ -295,7 +299,8 @@ export function serializeObservation(obs: GameObservationV1): string {
 }
 
 export function serializeDecisionState(obs: GameObservationV1): string {
-  const { schemaVersion, episodeId, tick, timestampMs, enemies, pickups, ...state } = obs;
+  const { schemaVersion, episodeId, tick, timestampMs, directive, enemies, pickups, ...state } =
+    obs;
   void schemaVersion;
   void episodeId;
   void tick;
@@ -303,13 +308,8 @@ export function serializeDecisionState(obs: GameObservationV1): string {
 
   return serializeStable({
     ...state,
-    enemies: enemies.map((enemy) => {
-      const { distance, verticalAlignment, withinWeaponRange, ...compactEnemy } = enemy;
-      void distance;
-      void verticalAlignment;
-      void withinWeaponRange;
-      return compactEnemy;
-    }),
+    directive: { id: directive.id },
+    enemies,
     pickups: pickups.map((pickup) => {
       const { distance, ...compactPickup } = pickup;
       void distance;
