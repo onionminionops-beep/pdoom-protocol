@@ -27,7 +27,7 @@ export function stepPlayer(world: WorldState, p: PlayerState, input: PlayerInput
   const dt = TICK_MS / 1000;
   const M = MOVEMENT;
   p.animMs += TICK_MS;
-  p.lastInput = input;
+  p.lastInput = { ...input };
 
   // timers
   p.fireCooldownMs = Math.max(0, p.fireCooldownMs - TICK_MS);
@@ -102,19 +102,21 @@ export function stepPlayer(world: WorldState, p: PlayerState, input: PlayerInput
   const jumpPressed = input.verticalAction === "jump";
   if (jumpPressed && !p.jumpHeld) p.jumpBufferMs = M.jumpBufferMs;
   if (jumpPressed) p.jumpHeldMs += TICK_MS;
-  else p.jumpHeldMs = 0;
+  else if (!p.jumping) p.jumpHeldMs = 0;
   p.jumpHeld = jumpPressed;
 
   const canJumpNow = p.grounded || p.coyoteMs > 0;
   if (p.jumpBufferMs > 0 && canJumpNow) {
     p.vel.y = M.jumpVelocity;
     p.jumping = true;
+    p.jumpHeldMs = 0;
     p.grounded = false;
     p.coyoteMs = 0;
     p.jumpBufferMs = 0;
     events.push({ type: "jump", playerId: p.id });
   }
-  if (p.jumping && !jumpPressed && p.vel.y < M.jumpCutVelocity && p.jumpHeldMs >= 0) {
+  if (p.jumping && !jumpPressed) p.jumpHeldMs += TICK_MS;
+  if (p.jumping && !jumpPressed && p.vel.y < M.jumpCutVelocity && p.jumpHeldMs >= M.jumpMinHoldMs) {
     p.vel.y = M.jumpCutVelocity;
     p.jumping = false;
   }
